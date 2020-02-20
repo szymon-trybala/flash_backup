@@ -1,16 +1,15 @@
-use std::fs;
-use std::fs::File;
-use std::process::exit;
-
+use walkdir::WalkDir;
+use std::io;
 fn main() {
-    // Testing copy
-    let new_file_name = "output_temp_test_text.txt";
-    let _new_file = File::create(new_file_name);
-    match fs::copy("input_temp_test_text.txt", new_file_name) {
-        Err(_) => {
-            println!("Error while copying");
-            exit(-1);
-        },
-        Ok(_) => println!("OK"),
+    println!("Write path to folder: ");
+    let mut path = String::new();
+    io::stdin().read_line(&mut path);
+
+    let mut files_vec = Vec::new();
+    for entry in WalkDir::new(&path).into_iter().filter_map(|e| e.ok()) {
+        files_vec.push(entry);
+    }
+    for x in &files_vec {
+        println!("{:?} {}", x.file_type() ,x.path().display());
     }
 }
