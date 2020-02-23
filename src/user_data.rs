@@ -1,5 +1,7 @@
 use std::io;
-use std::process::exit;
+use std::fs;
+use std::path::Path;
+use std::process;
 
 pub struct Paths {
     pub input_path: String,
@@ -16,10 +18,22 @@ impl Paths {
 
     pub fn handle_input_path(&mut self, path_raw: &str) {
         self.input_path = String::from(path_raw.trim());
+        if !Path::new(&self.input_path).exists() {
+            println!("This input path doesn't exist, program will shut down");
+            process::exit(-1);
+        }
     }
 
     pub fn handle_output_path(&mut self, path_raw: &str) {
         self.output_path = String::from(path_raw.trim());
+        if !Path::new(&self.output_path).exists() {
+            println!("Output folder doesn't exist, creating...");
+            if let Err(_) = fs::create_dir_all(&self.output_path) {
+                println!("Error creating destination folder");
+                process::exit(-1);
+            }
+            println!("Output folder created!")
+        }
     }
 
     pub fn ask_for_input(&mut self) {
@@ -33,7 +47,7 @@ impl Paths {
             }
             Err(_error) => {
                 println!("Error reading path to source folder");
-                exit(-1);
+                process::exit(-1);
             }
         }
     }
@@ -49,9 +63,8 @@ impl Paths {
             }
             Err(_error) => {
                 println!("Error reading path to destination folder");
-                exit(-1);
+                process::exit(-1);
             }
         }
     }
 }
-
