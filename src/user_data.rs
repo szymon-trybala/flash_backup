@@ -2,6 +2,8 @@ use std::io;
 use std::fs;
 use std::path::Path;
 use std::process;
+use std::fs::File;
+use std::io::{BufReader, BufRead};
 
 pub struct Paths {
     pub input_path: String,
@@ -64,6 +66,38 @@ impl Paths {
             Err(_error) => {
                 println!("Error reading path to destination folder");
                 process::exit(-1);
+            }
+        }
+    }
+
+    pub fn load_ignores() -> Result<((Vec<String>, Vec<String>)), &'static str>  {
+        return match File::open("ignore") {
+            Err(_) => {
+                Err("Couldn't find ignore file, please make sure it's in Flash Backup root folder")
+            }
+            Ok(file) => {
+                let mut ignores_folders = Vec::new();
+                let mut ignores_extensions = Vec::new();
+                let reader = BufReader::new(file);
+
+                for (index, line) in reader.lines().enumerate() {
+                    match line {
+                        Err(_) => {
+                            println!("Couldn't read line {}, it will be skipped", &index);
+                            continue;
+                        }
+                        Ok(line) => {
+                            // Lines for file extensions has to start with dot and not end with / or \
+                            if line.starts_with(".") {
+                                ignores_extensions.push(line);
+                            } else if line.starts_with("/") || line.starts_with("\\") {
+                                ignores_folders.push(line);
+                            }
+                        }
+                    }
+                }
+                println!("Ignoring {} folders and {} file extensions", ignores_folders.len(), ignores_extensions.len());
+                return Ok((ignores_folders, ignores_extensions));
             }
         }
     }

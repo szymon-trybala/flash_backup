@@ -18,24 +18,33 @@ impl Copying {
         copying
     }
 
-    pub fn exclude_folder(&mut self, folders: &Vec<&str>) -> Result<(), &'static str> {
+    pub fn exclude_folder(&mut self, folders: &Vec<String>) -> Result<(), &'static str> {
         if self.source_file_tree.is_empty() {
             return Err("Error: folder tree is empty");
         }
+
         for entry in folders {
+            // Checking if path exists
+            let mut full_entry_path =  String::from(self.source_file_tree[0].path().to_str().unwrap());
+            full_entry_path.push_str(&entry);
+
+            let path = Path::new(&full_entry_path);
+            if !path.exists() {
+                println!("{} doesn't exist, skipping", path.to_str().unwrap());
+            }
+
             // Checking if path to exclude is folder
-            let path = Path::new(entry);
             if !path.is_dir() {
-               println!("{} isn't directory, skipping!", path.to_str().unwrap());
+               println!("{} isn't directory, skipping", path.to_str().unwrap());
                 continue;
             }
             self.source_file_tree.retain(|x|
-                !x.path().to_str().expect("Error while converting path {} to string").contains(entry))
+                !x.path().to_str().expect("Error while converting path {} to string").contains(&full_entry_path))
         }
         Ok(())
     }
 
-    pub fn exclude_files_with_extension(&mut self, extensions: &Vec<&str>) -> Result<(), &'static str> {
+    pub fn exclude_files_with_extension(&mut self, extensions: &Vec<String>) -> Result<(), &'static str> {
         if self.source_file_tree.is_empty() {
             return Err("File tree is empty!");
         }
@@ -45,7 +54,7 @@ impl Copying {
             self.source_file_tree.retain(|x| !(x.path().is_file() &&
                 x.path().to_str().expect("Error converting to &str in exclude_files_with_extension").ends_with(entry)));
         }
-        match (self.source_file_tree.is_empty() || self.source_file_tree.len() == start_len) {
+        match self.source_file_tree.is_empty() || self.source_file_tree.len() == start_len {
             true => Err("Source file tree hasn't changed or is empty"),
             false => Ok(())
         }

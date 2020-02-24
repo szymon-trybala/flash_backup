@@ -5,20 +5,29 @@ use user_data::Paths;
 use crate::copying::Copying;
 
 fn main() {
+    // TODO AT FINISH CHECK ALL unwrap() and expect()
+
     let paths = Paths::new();
     let mut copying = Copying::new(paths.input_path.as_str());
 
-    let mut exclude_folders = Vec::new();
-    exclude_folders.push("/home/szymon/Downloads/HOPS/Sample");
+    match Paths::load_ignores() {
+        Err(e) => {
+            println!("{}", &e);
+        }
 
-    let mut exclude_extensions = Vec::new();
-    exclude_extensions.push(".srt");
+        Ok(ignores) => {
+            if ignores.0.len() > 0 {
+                if let Err(_) = copying.exclude_folder(&ignores.0) {
+                    println!("Error excluding folders, program will copy every folder!");
+                }
+            }
+            if ignores.1.len() > 0 {
+                if let Err(_) = copying.exclude_files_with_extension(&ignores.1) {
+                    println!("Error excluding extensions, program will copy files with every extensions!");
+                }
+            }
+        }
+    }
 
-    if let Err(_) = copying.exclude_folder(&exclude_folders) {
-        println!("Error excluding folders, program will copy every folder!");
-    }
-    if let Err(_) = copying.exclude_files_with_extension(&exclude_extensions) {
-        println!("Error excluding extensions, program will copy files with every extensions!");
-    }
     copying.copy(&paths.output_path)
 }
