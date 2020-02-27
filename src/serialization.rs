@@ -4,8 +4,10 @@ use std::fs::File;
 use std::io::prelude::*;
 use sha1::{Sha1, Digest};
 use hex;
+use ring::digest::{Context, Digest as ring_digest, SHA256};
 
 use blake3;
+use std::io::BufReader;
 
 const BUFFER_SIZE: usize = 256000;
 
@@ -32,6 +34,30 @@ pub fn generate_hash_sha1(path: &String) -> Result<String, &'static str> {
             }
             let hash = hasher.result();
             Ok(hex::encode(hash))
+        }
+        Err(_) => Err("Error opening file while generating hash")
+    }
+}
+
+// 8 video files, 2,8 GB combined - 11s of copying + 12s hashing on i5 6200U. Why is this so much faster?
+pub fn generate_hash_sha256(path: &String) -> Result<String, &'static str> {
+    match File::open(path) {
+        Ok(file) => {
+           let mut reader = BufReader::new(file);
+            let mut context = Context::new(&SHA256);
+            let mut buffer = [0; 1024];
+
+            loop {
+                let count = reader.read(&mut buffer).unwrap();
+                if count == 0 {
+                    break;
+                }
+                context.update(&buffer[..count])
+            }
+            let digest = context.finish();
+
+
+            Ok(hex::encode(digest.as_ref()))
         }
         Err(_) => Err("Error opening file while generating hash")
     }
@@ -66,7 +92,7 @@ impl Serialization {
 
         for path in paths {
             // Right now SHA-1 is 1/3 faster than Blake3, but it's bad implementation anyway - 25s for 300 MB file is terrible
-            match generate_hash_sha1(&path) {
+            match generate_hash_sha256(&path) {
                 Ok(hash) => {
                     serialization.map.insert(String::from(path), hash);
                 }
