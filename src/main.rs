@@ -1,8 +1,11 @@
 mod user_data;
 mod copying;
+mod serialization;
 
 use user_data::Paths;
 use crate::copying::Copying;
+use crate::serialization::Serialization;
+use std::collections::HashMap;
 
 fn main() {
     // TODO AT FINISH CHECK ALL unwrap() and expect()
@@ -28,6 +31,14 @@ fn main() {
             }
         }
     }
-
-    copying.copy(&paths.output_path)
+    copying.copy(&paths.output_path);
+    let serialization = Serialization::new(copying.output_files_paths).unwrap_or(Serialization { map: HashMap::new()});
+    match serialization.serialize_to_json(paths.output_path) {
+        Ok(_) => {
+            println!("JSON file map succesfully saved in root output folder!");
+        }
+        Err(e) => {
+            println!("Serialization to JSON: {}", e);
+        }
+    }
 }

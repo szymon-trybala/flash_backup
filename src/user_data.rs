@@ -46,6 +46,10 @@ impl Paths {
         match io::stdin().read_line(&mut path) {
             Ok(_n) => {
                 self.handle_input_path(&path[..]);
+                if path.len() == 0 {
+                    println!("Input path is empty!");
+                    process::exit(-1);
+                }
             }
             Err(_error) => {
                 println!("Error reading path to source folder");
@@ -62,6 +66,10 @@ impl Paths {
         match io::stdin().read_line(&mut path) {
             Ok(_n) => {
                 self.handle_output_path(&path[..]);
+                if path.len() == 0 {
+                    println!("Input path is empty!");
+                    process::exit(-1);
+                }
             }
             Err(_error) => {
                 println!("Error reading path to destination folder");
