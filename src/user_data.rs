@@ -78,7 +78,7 @@ impl Paths {
         }
     }
 
-    pub fn load_ignores() -> Result<((Vec<String>, Vec<String>)), &'static str>  {
+    pub fn load_ignores() -> Result<(Vec<String>, Vec<String>), &'static str>  {
         return match File::open("ignore") {
             Err(_) => {
                 Err("Couldn't find ignore file, please make sure it's in Flash Backup root folder")
