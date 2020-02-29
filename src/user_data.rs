@@ -3,19 +3,73 @@ use std::fs;
 use std::path::Path;
 use std::process;
 use std::fs::File;
-use std::io::{BufReader, BufRead};
+use std::io::{BufReader, BufRead, Write};
+use std::error::Error;
+use serde_json;
+use serde::{Deserialize, Serialize};
 
-pub struct Paths {
+
+
+static CONFIG_FILE: &str = "config.json";
+
+#[derive(Serialize, Deserialize)]
+pub struct Config {
     pub input_path: String,
     pub output_path: String,
+    pub max_backups: usize,
 }
 
-impl Paths {
-    pub fn new() -> Paths {
-        let mut paths = Paths { input_path: String::new(), output_path: String::new() };
-        paths.ask_for_input();
-        paths.ask_for_output();
-        paths
+impl Config {
+    pub fn new() -> Config {
+        let mut paths = Config { input_path: String::new(), output_path: String::new(), max_backups: 3 };
+        match paths.load_config() {
+            Ok(_) => paths,
+            Err(e) => panic!("Error loading config: {}", e.to_string())
+        }
+    }
+
+    pub fn load_config(&mut self) -> Result<(), Box<dyn Error>> {
+        if Path::new(CONFIG_FILE).exists() {
+            let mut file = File::open(CONFIG_FILE)?;
+            let buf_reader = BufReader::new(file);
+
+            let content: Config = serde_json::from_reader(buf_reader)?;
+            self.input_path = content.input_path;
+            self.output_path = content.output_path;
+            self.max_backups = content.max_backups;
+            Ok(())
+        } else {
+            self.ask_for_config();
+            Ok(())
+        }
+    }
+
+    // TODO - duplicates with saving map, can be reafactored
+    pub fn save_config_to_json(&mut self) -> Result<(), &'static str> {
+        match serde_json::to_string_pretty(&self) {
+            Err(_) => Err("Serialization to string failed"),
+            Ok(json_string) => {
+                match File::create(CONFIG_FILE) {
+                    Err(_) => Err("Error: couldn't create JSON file with folder map!"),
+                    Ok(mut file) => {
+                        match file.write_all(json_string.as_ref()) {
+                            Err(_) => Err("Error: couldn't write JSON text to file"),
+                            Ok(_) => Ok(())
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn ask_for_config(&mut self) {
+        self.ask_for_input();
+        self.ask_for_output();
+        self.ask_for_max_backups_amount();
+
+        if let Err(_) = self.save_config_to_json() {
+            println!("Error writing config to file, config won't be saved!");
+        }
     }
 
     pub fn handle_input_path(&mut self, path_raw: &str) {
@@ -46,9 +100,9 @@ impl Paths {
         match io::stdin().read_line(&mut path) {
             Ok(_n) => {
                 self.handle_input_path(&path[..]);
-                if path.len() == 0 {
+                if path.trim().len() == 0 {
                     println!("Input path is empty!");
-                    process::exit(-1);
+                    self.ask_for_input();
                 }
             }
             Err(_error) => {
@@ -66,16 +120,36 @@ impl Paths {
         match io::stdin().read_line(&mut path) {
             Ok(_n) => {
                 self.handle_output_path(&path[..]);
-                if path.len() == 0 {
+                if path.trim().len() == 0 {
                     println!("Input path is empty!");
-                    process::exit(-1);
+                    self.ask_for_output();
                 }
             }
-            Err(_error) => {
-                println!("Error reading path to destination folder");
-                process::exit(-1);
+            Err(_) => {
+                panic!("Error reading path to destination folder");
             }
         }
+    }
+
+    pub fn ask_for_max_backups_amount(&mut self) {
+        let mut amount = String::new();
+        println!("How many backups do you want to keep?:");
+
+        match io::stdin().read_line(&mut amount) {
+            Ok(_) => {
+                if amount.trim().len() == 0 {
+                    println!("Input string is empty!");
+                    self.ask_for_max_backups_amount();
+                }
+
+                let amount: usize = amount.parse().unwrap_or(3);
+                self.max_backups = amount;
+            }
+            Err(_) => {
+                panic!("Error reading input for max backups amount")
+            }
+        }
+
     }
 
     pub fn load_ignores() -> Result<(Vec<String>, Vec<String>), &'static str>  {

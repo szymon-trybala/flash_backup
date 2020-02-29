@@ -3,19 +3,24 @@ mod copying;
 mod serialization;
 mod multiple_mode;
 
-use user_data::Paths;
+use user_data::Config;
 use crate::copying::Copying;
 use crate::serialization::{Serialization, BackupMetadata};
 use std::collections::HashMap;
 use crate::multiple_mode::Multiple;
 
 fn main() {
-    // // TODO AT FINISH CHECK ALL unwrap() and expect()
+    // TODO AT FINISH CHECK ALL unwrap() and expect()
+    // TODO, MOVE EVERYTHING DO LOGICAL MODULES, NOW CODE IS ALL OVER THE PLACE
+
+    let config = Config::new();
+    let mut multiple = Multiple::new();
+    multiple.find_backups(String::from("/home/szymon/Downloads/2")).unwrap();
+    multiple.delete_oldest_folder().unwrap();
+
+    // let mut copying = Copying::new(config.input_path.as_str());
     //
-    // let paths = Paths::new();
-    // let mut copying = Copying::new(paths.input_path.as_str());
-    //
-    // match Paths::load_ignores() {
+    // match Config::load_ignores() {
     //     Err(e) => {
     //         println!("{}", &e);
     //     }
@@ -33,9 +38,9 @@ fn main() {
     //         }
     //     }
     // }
-    // copying.copy(&paths.output_path);
+    // copying.copy(&config.output_path);
     // let mut serialization = Serialization::new(copying.output_files_paths).unwrap_or(Serialization { map: HashMap::new(), metadata: BackupMetadata::new()});
-    // match serialization.serialize_to_json(paths.output_path) {
+    // match serialization.serialize_to_json(config.output_path) {
     //     Ok(_) => {
     //         println!("JSON file map succesfully saved in root output folder!");
     //     }
@@ -43,7 +48,4 @@ fn main() {
     //         println!("Serialization to JSON: {}", e);
     //     }
     // }
-
-    let mut multiple = Multiple::new();
-    multiple.find_backups(String::from("/home/szymon/Downloads/2")).unwrap();
 }

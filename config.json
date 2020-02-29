@@ -1,0 +1,5 @@
+{
+  "input_path": "/home/szymon/Downloads/HOPS",
+  "output_path": "/home/szymon/Downloads/DUPS",
+  "max_backups": 3
+}

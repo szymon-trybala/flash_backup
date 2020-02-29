@@ -10,17 +10,16 @@ use std::io::{BufReader};
 use uuid::Uuid;
 use chrono::prelude::*;
 
-#[derive(Debug)]
 #[derive(Serialize, Deserialize)]
 pub struct BackupMetadata {
-    id: String,
-    date: String,
-    elements: usize,
-    output_folder: String
+    pub id: String,
+    pub timestamp: i64,
+    pub elements: usize,
+    pub output_folder: String
 }
 impl BackupMetadata {
     pub fn new() -> BackupMetadata {
-        let backup_metadata = BackupMetadata { id: String::new(), date: String::new(), elements: 0, output_folder: String::new()};
+        let backup_metadata = BackupMetadata { id: String::new(), timestamp: 0, elements: 0, output_folder: String::new()};
         backup_metadata
     }
 }
@@ -72,7 +71,7 @@ impl Serialization {
     }
 
     fn generate_metadata(&self, output_folder: &String) -> BackupMetadata {
-       BackupMetadata { id: Uuid::new_v4().to_string(), date: Utc::now().to_string(), elements: self.map.len(), output_folder: output_folder.clone() }
+       BackupMetadata { id: Uuid::new_v4().to_string(), timestamp: Utc::now().timestamp(), elements: self.map.len(), output_folder: output_folder.clone() }
     }
 }
 
