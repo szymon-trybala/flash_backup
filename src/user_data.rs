@@ -30,7 +30,7 @@ impl Config {
 
     pub fn load_config(&mut self) -> Result<(), Box<dyn Error>> {
         if Path::new(CONFIG_FILE).exists() {
-            let mut file = File::open(CONFIG_FILE)?;
+            let file = File::open(CONFIG_FILE)?;
             let buf_reader = BufReader::new(file);
 
             let content: Config = serde_json::from_reader(buf_reader)?;

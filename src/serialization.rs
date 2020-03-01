@@ -50,13 +50,13 @@ impl Serialization {
         Ok(serialization)
     }
 
-    pub fn serialize_to_json(&mut self, save_folder: String) -> Result<(), &'static str> {
+    pub fn serialize_to_json(&mut self, save_folder: &str) -> Result<(), &'static str> {
         self.metadata = self.generate_metadata(&save_folder);
 
         match serde_json::to_string_pretty(&self) {
             Err(_) => Err("Serialization to string failed"),
             Ok(json_string) => {
-                let output_path = String::from(save_folder + "/map.json");
+                let output_path = String::from(save_folder) + "/map.json";
                 match File::create(output_path) {
                     Err(_) => Err("Error: couldn't create JSON file with folder map!"),
                     Ok(mut file) => {
@@ -70,8 +70,8 @@ impl Serialization {
         }
     }
 
-    fn generate_metadata(&self, output_folder: &String) -> BackupMetadata {
-       BackupMetadata { id: Uuid::new_v4().to_string(), timestamp: Utc::now().timestamp(), elements: self.map.len(), output_folder: output_folder.clone() }
+    fn generate_metadata(&self, output_folder: &str) -> BackupMetadata {
+       BackupMetadata { id: Uuid::new_v4().to_string(), timestamp: Utc::now().timestamp(), elements: self.map.len(), output_folder: output_folder.to_string() }
     }
 }
 
