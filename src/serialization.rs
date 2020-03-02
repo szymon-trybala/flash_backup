@@ -10,6 +10,14 @@ use std::io::{BufReader};
 use uuid::Uuid;
 use chrono::prelude::*;
 
+static FILE_MAP_NAME: &str = ".map.json";
+
+#[cfg(target_os = "linux")]
+static FOLDER_SEPARATOR: &str = "/";
+
+#[cfg(target_os = "windows")]
+static FOLDER_SEPARATOR: &str = "\\";
+
 #[derive(Serialize, Deserialize)]
 pub struct BackupMetadata {
     pub id: String,
@@ -56,7 +64,7 @@ impl Serialization {
         match serde_json::to_string_pretty(&self) {
             Err(_) => Err("Serialization to string failed"),
             Ok(json_string) => {
-                let output_path = String::from(save_folder) + "/map.json";
+                let output_path = String::from(save_folder) + FOLDER_SEPARATOR + FILE_MAP_NAME;
                 match File::create(output_path) {
                     Err(_) => Err("Error: couldn't create JSON file with folder map!"),
                     Ok(mut file) => {

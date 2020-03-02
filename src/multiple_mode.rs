@@ -7,11 +7,20 @@ use walkdir::{WalkDir};
 use std::convert::TryFrom;
 use chrono::prelude::*;
 
+static FILE_MAP_NAME: &str = ".map.json";
+
+#[cfg(target_os = "linux")]
+static FOLDER_SEPARATOR: &str = "/";
+
+#[cfg(target_os = "windows")]
+static FOLDER_SEPARATOR: &str = "\\";
+
 pub struct Multiple {
     max_backups: usize,
     root_folder: String,
     backups: Vec<BackupMetadata>
 }
+
 impl Multiple {
     pub fn new(max_backups: usize, root_folder: String) -> Multiple {
        Multiple { max_backups, root_folder, backups: Vec::new()}
@@ -26,18 +35,17 @@ impl Multiple {
         // Deleting every redundant folder
         loop {
             if self.backups.len() >= self.max_backups {
-                if let Err(e) = self.delete_oldest_folder() {
-                    println!("Error creating new backup folder: {}", e);
-                    return Err(e);
+                if let Err(_) = self.delete_oldest_folder() {
+                    panic!("Error while creating new backup folder, program will stop")
                 }
             } else {
                 break;
             }
         }
 
-        let now: chrono::DateTime<Utc> = Utc::now();
-        let date = now.to_rfc3339_opts(SecondsFormat::Secs, true);
-        let new_path = self.root_folder.clone() + "/" + date.as_str();
+        let now: chrono::DateTime<Local> = Local::now();
+        let date = now.format("%d-%m-%Y %H_%M_%S").to_string();
+        let new_path = self.root_folder.clone() + &FOLDER_SEPARATOR + date.as_str();
         Ok(new_path)
     }
 
@@ -45,7 +53,7 @@ impl Multiple {
     fn find_backups(&mut self) -> Result<(), Box<dyn Error>> {
         let mut vec = Vec::new();
         for entry in WalkDir::new(&self.root_folder).into_iter().filter_map(|e| e.ok()) {
-            if entry.path().ends_with("map.json") {
+            if entry.path().ends_with(&FILE_MAP_NAME) {
                 let file = File::open(entry.path()).unwrap();
                 let buf_reader = BufReader::new(file);
 
@@ -56,6 +64,8 @@ impl Multiple {
         self.backups = vec;
         if self.backups.len() == 0 {
             println!("No previous backups found in {}", &self.root_folder);
+        } else {
+            println!("{} previous backups found in {}", self.backups.len(), &self.root_folder);
         }
         Ok(())
     }

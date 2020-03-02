@@ -1,7 +1,6 @@
 use walkdir::{WalkDir, DirEntry};
 use std::fs;
 use std::io;
-use std::path::Path;
 
 pub struct Copying {
     source_files_tree: Vec<DirEntry>,
@@ -26,23 +25,22 @@ impl Copying {
         }
 
         for entry in folders {
-            // Checking if path exists
-            let mut full_entry_path =  String::from(self.source_files_tree[0].path().to_str().unwrap());
-            full_entry_path.push_str(&entry);
+            // Collecting folders to exclude
+            let folders_to_exclude: Vec<DirEntry> = self.source_files_tree.iter().
+                filter(|x| x.path().exists() && x.path().is_dir()
+                    && x.path().to_str().expect("Error converting path to &str, program will shut down")
+                    .contains(entry.as_str())).cloned().collect();
 
-            let path = Path::new(&full_entry_path);
-            if !path.exists() {
-                println!("{} doesn't exist, skipping", path.to_str().unwrap());
-                continue;
-            }
+            // Excluding folders
+            self.source_files_tree
+                .retain(|x|!(x.path().exists() && x.path().is_dir()
+                    && x.path().to_str().expect("Error converting path to &str, program will shut down").
+                    contains(entry.as_str())));
 
-            // Checking if path to exclude is folder
-            if !path.is_dir() {
-               println!("{} isn't directory, skipping", path.to_str().unwrap());
-                continue;
+            // Excluding files in excluded folders
+            for folder in folders_to_exclude {
+                self.source_files_tree.retain(|x| !(x.path().starts_with(folder.path())));
             }
-            self.source_files_tree.retain(|x|
-                !x.path().to_str().expect("Error while converting path {} to string").contains(&full_entry_path))
         }
         Ok(())
     }

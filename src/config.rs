@@ -9,6 +9,11 @@ use serde_json;
 use serde::{Deserialize, Serialize};
 
 
+#[cfg(target_os = "linux")]
+static FOLDER_SEPARATOR: &str = "/";
+
+#[cfg(target_os = "windows")]
+static FOLDER_SEPARATOR: &str = "\\";
 
 static CONFIG_FILE: &str = "config.json";
 
@@ -63,6 +68,7 @@ impl Config {
     }
 
     pub fn ask_for_config(&mut self) {
+        println!("Couldn't find config file, help us create one");
         self.ask_for_input();
         self.ask_for_output();
         self.ask_for_max_backups_amount();
@@ -155,7 +161,7 @@ impl Config {
     pub fn load_ignores() -> Result<(Vec<String>, Vec<String>), &'static str>  {
         return match File::open("ignore") {
             Err(_) => {
-                Err("Couldn't find ignore file, please make sure it's in Flash Backup root folder")
+                Err("No ignore file found")
             }
             Ok(file) => {
                 let mut ignores_folders = Vec::new();
@@ -165,14 +171,14 @@ impl Config {
                 for (index, line) in reader.lines().enumerate() {
                     match line {
                         Err(_) => {
-                            println!("Couldn't read line {}, it will be skipped", &index);
+                            println!("Couldn't read line {} of ignore file, it will be skipped", &index);
                             continue;
                         }
                         Ok(line) => {
                             // Lines for file extensions has to start with dot and not end with / or \
                             if line.starts_with(".") {
                                 ignores_extensions.push(line);
-                            } else if line.starts_with("/") || line.starts_with("\\") {
+                            } else if line.starts_with(&FOLDER_SEPARATOR) {
                                 ignores_folders.push(line);
                             }
                         }
