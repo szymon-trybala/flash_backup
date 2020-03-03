@@ -12,7 +12,7 @@ use crate::multiple_mode::Multiple;
 fn main() {
     // TODO AT FINISH CHECK ALL unwrap() and expect()
     // TODO, MOVE EVERYTHING DO LOGICAL MODULES, NOW CODE IS ALL OVER THE PLACE
-
+    println!("Hello, to ignore desired folders or file extensions fill up 'ignore' file in program directory");
     let config = Config::new();
     let mut multiple = Multiple::new(config.max_backups, config.output_path.clone());
     match multiple.create_new_backup_folder() {
