@@ -15,18 +15,18 @@ static FOLDER_SEPARATOR: &str = "/";
 #[cfg(target_os = "windows")]
 static FOLDER_SEPARATOR: &str = "\\";
 
-static CONFIG_FILE: &str = "config.json";
+static CONFIG_FILE: &str = ".config.json";
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
-    pub input_path: String,
+    pub input_paths: Vec<String>,
     pub output_path: String,
     pub max_backups: usize,
 }
 
 impl Config {
     pub fn new() -> Config {
-        let mut paths = Config { input_path: String::new(), output_path: String::new(), max_backups: 3 };
+        let mut paths = Config { input_paths: Vec::new(), output_path: String::new(), max_backups: 3 };
         match paths.load_config() {
             Ok(_) => paths,
             Err(e) => panic!("Error loading config: {}", e.to_string())
@@ -39,7 +39,7 @@ impl Config {
             let buf_reader = BufReader::new(file);
 
             let content: Config = serde_json::from_reader(buf_reader)?;
-            self.input_path = content.input_path;
+            self.input_paths = content.input_paths;
             self.output_path = content.output_path;
             self.max_backups = content.max_backups;
             Ok(())
@@ -79,10 +79,12 @@ impl Config {
     }
 
     pub fn handle_input_path(&mut self, path_raw: &str) {
-        self.input_path = String::from(path_raw.trim());
-        if !Path::new(&self.input_path).exists() {
+        let trimmed = path_raw.trim();
+        if !Path::new(&trimmed).exists() {
             println!("This input path doesn't exist, program will shut down");
             process::exit(-1);
+        } else {
+            self.input_paths.push(String::from(trimmed));
         }
     }
 
@@ -99,22 +101,40 @@ impl Config {
     }
 
     pub fn ask_for_input(&mut self) {
-        let mut path = String::new();
-
-        println!("Write path to source folder:");
-
-        match io::stdin().read_line(&mut path) {
-            Ok(_n) => {
-                self.handle_input_path(&path[..]);
-                if path.trim().len() == 0 {
-                    println!("Input path is empty!");
-                    self.ask_for_input();
+        loop {
+            let mut path = String::new();
+            println!("Write path to source folder:");
+            match io::stdin().read_line(&mut path) {
+                Ok(_) => {
+                    self.handle_input_path(&path[..]);
+                    if path.trim().len() == 0 {
+                        println!("Input path is empty!");
+                        self.ask_for_input();
+                    }
+                }
+                Err(_) => {
+                    println!("Error reading path to source folder");
+                    process::exit(-1);
                 }
             }
-            Err(_error) => {
-                println!("Error reading path to source folder");
-                process::exit(-1);
+
+            let mut answer = String::new();
+            println!("Would you like to add another folder? (y/n):");
+            match io::stdin().read_line(&mut answer) {
+                Ok(_) => {
+                    let trimmed = answer.trim();
+                    if trimmed == "y" || trimmed == "yes" {
+                        continue;
+                    } else {
+                        break;
+                    }
+                }
+                Err(_) => {
+                    println!("Error processing your answer, asking again");
+                    continue;
+                }
             }
+
         }
     }
 
@@ -184,7 +204,7 @@ impl Config {
                         }
                     }
                 }
-                println!("Ignoring {} folders and {} file extensions", ignores_folders.len(), ignores_extensions.len());
+                println!("Found {} folders and {} file extensions in ignore file", ignores_folders.len(), ignores_extensions.len());
                 return Ok((ignores_folders, ignores_extensions));
             }
         }

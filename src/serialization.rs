@@ -23,11 +23,12 @@ pub struct BackupMetadata {
     pub id: String,
     pub timestamp: i64,
     pub elements: usize,
-    pub output_folder: String
+    pub output_folder: String,
+    pub input_folders: Vec<String>,
 }
 impl BackupMetadata {
     pub fn new() -> BackupMetadata {
-        let backup_metadata = BackupMetadata { id: String::new(), timestamp: 0, elements: 0, output_folder: String::new()};
+        let backup_metadata = BackupMetadata { id: String::new(), timestamp: 0, elements: 0, output_folder: String::new(), input_folders: Vec::new()};
         backup_metadata
     }
 }
@@ -58,8 +59,8 @@ impl Serialization {
         Ok(serialization)
     }
 
-    pub fn serialize_to_json(&mut self, save_folder: &str) -> Result<(), &'static str> {
-        self.metadata = self.generate_metadata(&save_folder);
+    pub fn serialize_to_json(&mut self, input_folders: &Vec<String>, save_folder: &str) -> Result<(), &'static str> {
+        self.metadata = self.generate_metadata(input_folders, &save_folder);
 
         match serde_json::to_string_pretty(&self) {
             Err(_) => Err("Serialization to string failed"),
@@ -78,8 +79,8 @@ impl Serialization {
         }
     }
 
-    fn generate_metadata(&self, output_folder: &str) -> BackupMetadata {
-       BackupMetadata { id: Uuid::new_v4().to_string(), timestamp: Utc::now().timestamp(), elements: self.map.len(), output_folder: output_folder.to_string() }
+    fn generate_metadata(&self, input_folders: &Vec<String> ,output_folder: &str) -> BackupMetadata {
+       BackupMetadata { id: Uuid::new_v4().to_string(), timestamp: Utc::now().timestamp(), elements: self.map.len(), output_folder: output_folder.to_string(), input_folders: input_folders.clone() }
     }
 }
 
