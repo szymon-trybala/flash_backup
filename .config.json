@@ -1,0 +1,8 @@
+{
+  "input_paths": [
+    "/home/szymon/Downloads/1",
+    "/home/szymon/Downloads/2"
+  ],
+  "output_path": "/home/szymon/Downloads/OUTPUT",
+  "max_backups": 3
+}
