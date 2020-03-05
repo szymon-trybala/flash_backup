@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs::File;
+use std::fs::{File};
 use std::io::prelude::*;
 use hex;
 use ring::digest::{Context, SHA256};
@@ -9,40 +9,18 @@ use meowhash::MeowHasher;
 use std::io::{BufReader};
 use uuid::Uuid;
 use chrono::prelude::*;
-
-static FILE_MAP_NAME: &str = ".map.json";
-
-#[cfg(target_os = "linux")]
-static FOLDER_SEPARATOR: &str = "/";
-
-#[cfg(target_os = "windows")]
-static FOLDER_SEPARATOR: &str = "\\";
-
-#[derive(Serialize, Deserialize)]
-pub struct BackupMetadata {
-    pub id: String,
-    pub timestamp: i64,
-    pub elements: usize,
-    pub output_folder: String,
-    pub input_folders: Vec<String>,
-}
-impl BackupMetadata {
-    pub fn new() -> BackupMetadata {
-        let backup_metadata = BackupMetadata { id: String::new(), timestamp: 0, elements: 0, output_folder: String::new(), input_folders: Vec::new()};
-        backup_metadata
-    }
-}
+use crate::{FOLDER_SEPARATOR, FILE_MAP_NAME};
+use crate::io::metadata::Metadata;
 
 #[derive(Serialize, Deserialize)]
 pub struct Serialization {
-    pub metadata: BackupMetadata,
+    pub metadata: Metadata,
     pub map: HashMap<String, String>,   // key = path, value = hash
 }
 
-
 impl Serialization {
     pub fn new(paths: Vec<String>) -> Result<Serialization, &'static str> {
-        let mut serialization = Serialization { metadata: BackupMetadata::new(), map: HashMap::new()};
+        let mut serialization = Serialization { metadata: Metadata::new(), map: HashMap::new()};
 
         for path in paths {
             // Right now SHA-1 is 1/3 faster than Blake3, but it's bad implementation anyway - 25s for 300 MB file is terrible
@@ -79,12 +57,11 @@ impl Serialization {
         }
     }
 
-    fn generate_metadata(&self, input_folders: &Vec<String> ,output_folder: &str) -> BackupMetadata {
-       BackupMetadata { id: Uuid::new_v4().to_string(), timestamp: Utc::now().timestamp(), elements: self.map.len(), output_folder: output_folder.to_string(), input_folders: input_folders.clone() }
+    fn generate_metadata(&self, input_folders: &Vec<String> ,output_folder: &str) -> Metadata {
+       Metadata { id: Uuid::new_v4().to_string(), timestamp: Utc::now().timestamp(), elements: self.map.len(), output_folder: output_folder.to_string(), input_folders: input_folders.clone() }
     }
 }
 
-// 8 video files, 2,8 GB combined - 11s of copying + 12s hashing on i5 6200U.
 pub fn generate_hash_sha256(path: &String) -> Result<String, &'static str> {
     match File::open(path) {
         Ok(file) => {
@@ -108,7 +85,6 @@ pub fn generate_hash_sha256(path: &String) -> Result<String, &'static str> {
     }
 }
 
-// ~ 2 GB, 3 files, 2s on Ryzen 3600 <3
 pub fn generate_hash_meow(path: &String) -> Result<String, &'static str> {
     match File::open(path) {
         Ok(file) => {

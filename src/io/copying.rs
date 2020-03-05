@@ -11,10 +11,10 @@ pub struct Copying {
 }
 
 impl Copying {
-    pub fn new(source_folders: &Vec<String>) -> Copying {
+    pub fn new(source_folders: &Vec<String>) -> Result<Copying, &'static str> {
         let mut copying = Copying { source_files_tree: Vec::new(), output_files_paths: Vec::new(), full_output_path: String::new() };
-        // Creating recursive tree of files in source folder using walkdir library
-        // TODO: improve filter_map, add error handling
+        println!("Creating file maps...");
+
         for folder in source_folders {
             let mut map = Vec::new();
             for entry in WalkDir::new(&folder).into_iter().filter_map(|e| e.ok()) {
@@ -22,19 +22,30 @@ impl Copying {
             }
             copying.source_files_tree.push(map);
         }
-        copying
+        println!("File maps created!");
+
+        if copying.source_files_tree.len() == 0 {
+            Err("map is empty")
+        } else {
+            Ok(copying)
+        }
     }
 
     pub fn exclude_folders(&mut self, folders: &Vec<String>) -> Result<(), &'static str> {
+        // TODO - ADD MULTITHREADING
         if self.source_files_tree.is_empty() {
             return Err("folder tree is empty");
         }
 
-        let mut count_before: usize = 0;
-        let mut count_after: usize = 0;
+        println!("Starting excluding folders...");
+
+        let mut len_start: usize = 0;
+        let mut len_end: usize = 0;
+        let mut folders_ignored: usize = 0;
+        let mut files_ignored: usize = 0;
 
         for i in 0..self.source_files_tree.len() {
-            count_before += self.source_files_tree[i].len();
+            len_start = self.source_files_tree[i].len();
             for entry in folders {
                 // Collecting folders to exclude
                 let folders_to_exclude: Vec<DirEntry> = self.source_files_tree[i].iter().
@@ -45,28 +56,35 @@ impl Copying {
                 // Excluding folders
                 self.source_files_tree[i].retain(|x| !(x.path().exists() && x.path().is_dir()
                     && x.path().to_str().expect("Fatal error while excluding folders").contains(entry.as_str())));
+                let len_temp = self.source_files_tree[i].len();
+                folders_ignored += len_start - len_temp;
 
                 // Excluding files in excluded folders
                 for folder in folders_to_exclude {
                     self.source_files_tree[i].retain(|x| !(x.path().starts_with(folder.path())));
                 }
+                files_ignored += len_temp - self.source_files_tree[i].len();
 
             }
-            count_after += self.source_files_tree[i].len();
+            len_end += self.source_files_tree[i].len();
         }
 
-        if count_before == count_after {
+        if len_start == len_end {
             println!("No folders matching ignore found");
+        } else {
+            println!("Ignored {} folders and {} files in them!", folders_ignored, files_ignored);
         }
         Ok(())
     }
 
     pub fn exclude_files_with_extensions(&mut self, extensions: &Vec<String>) -> Result<(), &'static str> {
         let mut unchanged_maps: usize = 0;
+        let mut excluded_files: usize = 0;
 
         if self.source_files_tree.is_empty() {
             return Err("file tree is empty");
         }
+        println!("Starting excluding files with selected extensions...");
 
         for i in 0..self.source_files_tree.len() {
             let start_len = self.source_files_tree[i].len();
@@ -79,18 +97,19 @@ impl Copying {
                     unchanged_maps += 1;
                 }
                 false => {
-                    continue;
+                    excluded_files += start_len - self.source_files_tree[i].len();
                 }
             }
         }
 
         if unchanged_maps == self.source_files_tree.len() {
             println!("No files matching exclude found");
+        } else {
+            println!("Succesfully excluded {} files", excluded_files);
         }
         Ok(())
     }
 
-    // TODO return Option
     pub fn copy(&mut self, to: &str) -> Result<(), &'static str> {
         if self.source_files_tree.is_empty() {
             return Err("folder tree is empty");

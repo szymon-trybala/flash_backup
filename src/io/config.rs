@@ -1,21 +1,13 @@
 use std::io;
 use std::fs;
 use std::path::Path;
-use std::process;
 use std::fs::File;
 use std::io::{BufReader, BufRead, Write};
 use std::error::Error;
 use serde_json;
 use serde::{Deserialize, Serialize};
-
-
-#[cfg(target_os = "linux")]
-static FOLDER_SEPARATOR: &str = "/";
-
-#[cfg(target_os = "windows")]
-static FOLDER_SEPARATOR: &str = "\\";
-
-static CONFIG_FILE: &str = ".config.json";
+use crate::{FOLDER_SEPARATOR, CONFIG_FILE};
+use std::convert::TryFrom;
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
@@ -25,11 +17,11 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new() -> Config {
-        let mut paths = Config { input_paths: Vec::new(), output_path: String::new(), max_backups: 3 };
-        match paths.load_config() {
-            Ok(_) => paths,
-            Err(e) => panic!("Error loading config: {}", e.to_string())
+    pub fn new() -> Result<Config, Box<dyn Error>> {
+        let mut config = Config { input_paths: Vec::new(), output_path: String::new(), max_backups: 3 };
+        match config.load_config() {
+            Ok(_) => Ok(config),
+            Err(e) => Err(e)
         }
     }
 
@@ -44,8 +36,13 @@ impl Config {
             self.max_backups = content.max_backups;
             Ok(())
         } else {
-            self.ask_for_config();
-            Ok(())
+            match self.ask_for_config() {
+                Err(e) => {
+                    let message = String::from("Error: ") + e;
+                    return Err(Box::try_from(message).unwrap())
+                }
+                Ok(_) => Ok(())
+            }
         }
     }
 
@@ -67,37 +64,39 @@ impl Config {
         }
     }
 
-    pub fn ask_for_config(&mut self) {
+    pub fn ask_for_config(&mut self) -> Result<(), &'static str> {
         println!("Couldn't find config file, help us create one");
         self.ask_for_input();
         self.ask_for_output();
         self.ask_for_max_backups_amount();
 
         if let Err(_) = self.save_config_to_json() {
-            println!("Error writing config to file, config won't be saved!");
+            return Err("couldn't write config to file, config won't be saved!");
         }
+        Ok(())
     }
 
-    pub fn handle_input_path(&mut self, path_raw: &str) {
+    pub fn handle_input_path(&mut self, path_raw: &str) -> Result<(), &'static str> {
         let trimmed = path_raw.trim();
         if !Path::new(&trimmed).exists() {
-            println!("This input path doesn't exist, program will shut down");
-            process::exit(-1);
+            return Err("this input path doesn't exist");
         } else {
             self.input_paths.push(String::from(trimmed));
         }
+        Ok(())
     }
 
-    pub fn handle_output_path(&mut self, path_raw: &str) {
+    pub fn handle_output_path(&mut self, path_raw: &str) -> Result<(), &'static str> {
         self.output_path = String::from(path_raw.trim());
         if !Path::new(&self.output_path).exists() {
             println!("Output folder doesn't exist, creating...");
             if let Err(_) = fs::create_dir_all(&self.output_path) {
-                println!("Error creating destination folder");
-                process::exit(-1);
+                return Err("couldn't create destination folder");
             }
-            println!("Output folder created!")
+            println!("Output folder created!");
         }
+
+        Ok(())
     }
 
     pub fn ask_for_input(&mut self) {
@@ -106,7 +105,10 @@ impl Config {
             println!("Write path to source folder:");
             match io::stdin().read_line(&mut path) {
                 Ok(_) => {
-                    self.handle_input_path(&path[..]);
+                    if let Err(e) = self.handle_input_path(&path[..]) {
+                        println!("Error: {}. Asking again...", e);
+                        continue;
+                    }
                     if path.trim().len() == 0 {
                         println!("Input path is empty!");
                         self.ask_for_input();
@@ -114,7 +116,7 @@ impl Config {
                 }
                 Err(_) => {
                     println!("Error reading path to source folder");
-                    process::exit(-1);
+                    self.ask_for_input();
                 }
             }
 
@@ -130,7 +132,7 @@ impl Config {
                     }
                 }
                 Err(_) => {
-                    println!("Error processing your answer, asking again");
+                    println!("Error processing your answer, asking again...");
                     continue;
                 }
             }
@@ -140,19 +142,22 @@ impl Config {
 
     pub fn ask_for_output(&mut self) {
         let mut path = String::new();
-
         println!("Write path to destination folder:");
 
         match io::stdin().read_line(&mut path) {
             Ok(_n) => {
-                self.handle_output_path(&path[..]);
+                if let Err(e) = self.handle_output_path(&path[..]) {
+                    let message = String::from("Couldn't handle your output folder: ") + e + ". Program will exit";
+                    panic!(message);
+                }
                 if path.trim().len() == 0 {
                     println!("Input path is empty!");
                     self.ask_for_output();
                 }
             }
             Err(_) => {
-                panic!("Error reading path to destination folder");
+                println!("Error reading path to destination folder, asking again...");
+                self.ask_for_output();
             }
         }
     }
@@ -172,7 +177,8 @@ impl Config {
                 self.max_backups = amount;
             }
             Err(_) => {
-                panic!("Error reading input for max backups amount")
+                println!("Error reading input for max backups amount, asking again...");
+                self.ask_for_max_backups_amount();
             }
         }
 
@@ -198,7 +204,7 @@ impl Config {
                             // Lines for file extensions has to start with dot and not end with / or \
                             if line.starts_with(".") {
                                 ignores_extensions.push(line);
-                            } else if line.starts_with(&FOLDER_SEPARATOR) {
+                            } else if line.starts_with(FOLDER_SEPARATOR) {
                                 ignores_folders.push(line);
                             }
                         }

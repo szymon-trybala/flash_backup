@@ -1,4 +1,3 @@
-use crate::serialization::{BackupMetadata, Serialization};
 use serde_json;
 use std::error::Error;
 use std::fs::File;
@@ -6,19 +5,14 @@ use std::io::BufReader;
 use walkdir::{WalkDir};
 use std::convert::TryFrom;
 use chrono::prelude::*;
-
-static FILE_MAP_NAME: &str = ".map.json";
-
-#[cfg(target_os = "linux")]
-static FOLDER_SEPARATOR: &str = "/";
-
-#[cfg(target_os = "windows")]
-static FOLDER_SEPARATOR: &str = "\\";
+use crate::{FOLDER_SEPARATOR, FILE_MAP_NAME};
+use crate::io::metadata::Metadata;
+use crate::io::serialization::Serialization;
 
 pub struct Multiple {
     max_backups: usize,
     root_folder: String,
-    backups: Vec<BackupMetadata>
+    backups: Vec<Metadata>
 }
 
 impl Multiple {
@@ -45,15 +39,14 @@ impl Multiple {
 
         let now: chrono::DateTime<Local> = Local::now();
         let date = now.format("%d-%m-%Y %H_%M_%S").to_string();
-        let new_path = self.root_folder.clone() + &FOLDER_SEPARATOR + date.as_str();
+        let new_path = self.root_folder.clone() + FOLDER_SEPARATOR + date.as_str();
         Ok(new_path)
     }
-
 
     fn find_backups(&mut self) -> Result<(), Box<dyn Error>> {
         let mut vec = Vec::new();
         for entry in WalkDir::new(&self.root_folder).into_iter().filter_map(|e| e.ok()) {
-            if entry.path().ends_with(&FILE_MAP_NAME) {
+            if entry.path().ends_with(FILE_MAP_NAME) {
                 let file = File::open(entry.path()).unwrap();
                 let buf_reader = BufReader::new(file);
 
