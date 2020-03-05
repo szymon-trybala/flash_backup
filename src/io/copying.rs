@@ -2,7 +2,6 @@ use walkdir::{WalkDir, DirEntry};
 use std::fs;
 use std::io;
 use std::path::MAIN_SEPARATOR;
-use std::fs::create_dir_all;
 
 pub struct Copying {
     pub source_files_tree: Vec<Vec<DirEntry>>,
@@ -20,12 +19,14 @@ impl Copying {
             for entry in WalkDir::new(&folder).into_iter().filter_map(|e| e.ok()) {
                 map.push(entry);
             }
-            copying.source_files_tree.push(map);
+            if map.len() > 0 {
+                copying.source_files_tree.push(map);
+            }
         }
         println!("File maps created!");
 
         if copying.source_files_tree.len() == 0 {
-            Err("map is empty")
+            Err("all folders are empty or non existing")
         } else {
             Ok(copying)
         }
@@ -124,7 +125,7 @@ impl Copying {
             }
 
             let current_folder_path = String::from(to) + MAIN_SEPARATOR.to_string().as_str() + self.source_files_tree[i][0].file_name().to_str().unwrap();
-            match create_dir_all(&current_folder_path) {
+            match fs::create_dir_all(&current_folder_path) {
                 Err(_) => {
                     return Err("couldn't create folder to copy files");
                 }

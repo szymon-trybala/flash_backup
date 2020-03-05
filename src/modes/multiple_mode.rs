@@ -1,3 +1,7 @@
+use crate::{FOLDER_SEPARATOR, FILE_MAP_NAME};
+use crate::io::metadata::Metadata;
+use crate::io::serialization::Serialization;
+
 use serde_json;
 use std::error::Error;
 use std::fs::File;
@@ -5,9 +9,6 @@ use std::io::BufReader;
 use walkdir::{WalkDir};
 use std::convert::TryFrom;
 use chrono::prelude::*;
-use crate::{FOLDER_SEPARATOR, FILE_MAP_NAME};
-use crate::io::metadata::Metadata;
-use crate::io::serialization::Serialization;
 
 pub struct Multiple {
     max_backups: usize,

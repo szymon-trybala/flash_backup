@@ -1,13 +1,13 @@
+use crate::{FOLDER_SEPARATOR, CONFIG_FILE};
+
 use std::io;
 use std::fs;
 use std::path::Path;
-use std::fs::File;
-use std::io::{BufReader, BufRead, Write};
 use std::error::Error;
 use serde_json;
 use serde::{Deserialize, Serialize};
-use crate::{FOLDER_SEPARATOR, CONFIG_FILE};
 use std::convert::TryFrom;
+use std::io::{Write, BufRead};
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
@@ -27,8 +27,8 @@ impl Config {
 
     pub fn load_config(&mut self) -> Result<(), Box<dyn Error>> {
         if Path::new(CONFIG_FILE).exists() {
-            let file = File::open(CONFIG_FILE)?;
-            let buf_reader = BufReader::new(file);
+            let file = fs::File::open(CONFIG_FILE)?;
+            let buf_reader = io::BufReader::new(file);
 
             let content: Config = serde_json::from_reader(buf_reader)?;
             self.input_paths = content.input_paths;
@@ -51,7 +51,7 @@ impl Config {
         match serde_json::to_string_pretty(&self) {
             Err(_) => Err("Serialization to string failed"),
             Ok(json_string) => {
-                match File::create(CONFIG_FILE) {
+                match fs::File::create(CONFIG_FILE) {
                     Err(_) => Err("Error: couldn't create JSON file with folder map!"),
                     Ok(mut file) => {
                         match file.write_all(json_string.as_ref()) {
@@ -185,14 +185,14 @@ impl Config {
     }
 
     pub fn load_ignores() -> Result<(Vec<String>, Vec<String>), &'static str>  {
-        return match File::open("ignore") {
+        return match fs::File::open("ignore") {
             Err(_) => {
                 Err("No ignore file found")
             }
             Ok(file) => {
                 let mut ignores_folders = Vec::new();
                 let mut ignores_extensions = Vec::new();
-                let reader = BufReader::new(file);
+                let reader = io::BufReader::new(file);
 
                 for (index, line) in reader.lines().enumerate() {
                     match line {

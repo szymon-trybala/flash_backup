@@ -1,16 +1,17 @@
+use crate::{FOLDER_SEPARATOR, FILE_MAP_NAME};
+use crate::io::metadata::Metadata;
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{File};
 use std::io::prelude::*;
+use std::io::{BufReader};
 use hex;
 use ring::digest::{Context, SHA256};
 use digest::Digest;
 use meowhash::MeowHasher;
-use std::io::{BufReader};
 use uuid::Uuid;
 use chrono::prelude::*;
-use crate::{FOLDER_SEPARATOR, FILE_MAP_NAME};
-use crate::io::metadata::Metadata;
 
 #[derive(Serialize, Deserialize)]
 pub struct Serialization {

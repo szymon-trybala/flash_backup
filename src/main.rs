@@ -1,20 +1,21 @@
 mod modes;
 mod io;
 
-use std::collections::HashMap;
 use crate::modes::multiple_mode::Multiple;
 use crate::io::config::Config;
 use crate::io::copying::Copying;
 use crate::io::serialization::Serialization;
 use crate::io::metadata::Metadata;
 
+use std::collections::HashMap;
+
 static FILE_MAP_NAME: &str = ".map.json";
 static CONFIG_FILE: &str = ".config.json";
 
-#[cfg(target_os = "linux")]
+#[cfg(unix)]
 pub static FOLDER_SEPARATOR: &str = "/";
 
-#[cfg(target_os = "windows")]
+#[cfg(windows)]
 static FOLDER_SEPARATOR: &str = "\\";
 
 fn main() {
