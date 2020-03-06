@@ -2,6 +2,7 @@ use crate::io::config::Config;
 use crate::modes::multiple_mode::Multiple;
 use crate::io::copying::Copying;
 use crate::io::serialization::Serialization;
+use crate::modes::Mode;
 
 pub mod modes;
 pub mod io;
@@ -16,20 +17,46 @@ pub static FOLDER_SEPARATOR: &str = "/";
 #[cfg(windows)]
 static FOLDER_SEPARATOR: &str = "\\";
 
-pub fn create_backup() {
-    let config = handle_config();
-    let multiple = handle_multiple_mode(&config);
-    let mut copying = handle_maps(&config);
-    handle_ignores(&mut copying);
-    handle_copying(&mut copying, &multiple.backup_folder[..]);
-    handle_serialization(&config, &copying, &multiple.backup_folder[..]);
+pub fn create_backup(custom_config: &str, custom_ignore: &str, custom_mode: &str) {
+    let config = handle_config(custom_config);
+    // TODO - could use Mode trait with backup_folder field
+    match custom_mode.trim() {
+        "m" | "multiple" => {
+            let multiple = handle_multiple_mode(&config);
+            let mut copying = handle_maps(&config);
+            handle_ignores(custom_ignore, &mut copying);
+            handle_copying(&mut copying, &multiple.backup_folder[..]);
+            handle_serialization(&config, &copying, &multiple.backup_folder[..]);
+        }
+        "c" | "cloud" => {
+            println!("NOT IMPLEMENTED YET");
+        }
+
+        _ => {
+            println!("Mode argument not provided, will load it from .config.json");
+            match config.mode {
+                Mode::Multiple => {
+                    println!("Default mode in .config.json is Multiple, executing...");
+                    let multiple = handle_multiple_mode(&config);
+                    let mut copying = handle_maps(&config);
+                    handle_ignores(custom_ignore, &mut copying);
+                    handle_copying(&mut copying, &multiple.backup_folder[..]);
+                    handle_serialization(&config, &copying, &multiple.backup_folder[..]);
+                }
+                Mode::Cloud => {
+                    println!("Default mode in .config.json is Cloud, executing...");
+                    println!("NOT IMPLEMENTED YET");
+                }
+            }
+        }
+    }
 }
 
-fn handle_config() -> Config {
-    if let Ok(config) = Config::new() {
+fn handle_config(custom_config: &str) -> Config {
+    if let Ok(config) = Config::new(custom_config) {
         config
     } else {
-        panic!("Fatal error while creating config!");
+        panic!("Fatal error while loading config");
     }
 }
 
@@ -54,8 +81,8 @@ fn handle_maps(config: &Config) -> Copying {
     }
 }
 
-fn handle_ignores(copying: &mut Copying) {
-    match Config::load_ignores() {
+fn handle_ignores(custom_ignore: &str, copying: &mut Copying) {
+    match Config::load_ignores(custom_ignore) {
         Err(e) => {
             println!("{}", &e);
         }
@@ -83,7 +110,7 @@ fn handle_copying(copying: &mut Copying, folder: &str) {
 
 fn handle_serialization(config: &Config, copying: &Copying, folder: &str) {
     if let Ok(mut serialization) = Serialization::new(&copying.output_files_paths) {
-        match serialization.serialize_to_json(&config.input_paths, &folder) {
+        match serialization.serialize_to_json(&config.input_paths, &folder, &config.mode) {
             Ok(_) => {
                 println!("JSON file map succesfully saved in root output folder!");
             }

@@ -12,6 +12,7 @@ use digest::Digest;
 use meowhash::MeowHasher;
 use uuid::Uuid;
 use chrono::prelude::*;
+use crate::modes::Mode;
 
 #[derive(Serialize, Deserialize)]
 pub struct Serialization {
@@ -37,8 +38,8 @@ impl Serialization {
         Ok(serialization)
     }
 
-    pub fn serialize_to_json(&mut self, input_folders: &Vec<String>, save_folder: &str) -> Result<(), &'static str> {
-        self.metadata = self.generate_metadata(input_folders, &save_folder);
+    pub fn serialize_to_json(&mut self, input_folders: &Vec<String>, save_folder: &str, mode: &Mode) -> Result<(), &'static str> {
+        self.metadata = self.generate_metadata(input_folders, &save_folder, mode);
 
         match serde_json::to_string_pretty(&self) {
             Err(_) => Err("Serialization to string failed"),
@@ -57,8 +58,8 @@ impl Serialization {
         }
     }
 
-    fn generate_metadata(&self, input_folders: &Vec<String> ,output_folder: &str) -> Metadata {
-       Metadata { id: Uuid::new_v4().to_string(), timestamp: Utc::now().timestamp(), elements: self.map.len(), output_folder: output_folder.to_string(), input_folders: input_folders.clone() }
+    fn generate_metadata(&self, input_folders: &Vec<String> ,output_folder: &str, mode: &Mode) -> Metadata {
+       Metadata { id: Uuid::new_v4().to_string(), timestamp: Utc::now().timestamp(), elements: self.map.len(), mode: mode.clone(),  output_folder: output_folder.to_string(), input_folders: input_folders.clone() }
     }
 }
 

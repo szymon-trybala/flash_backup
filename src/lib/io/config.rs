@@ -8,32 +8,41 @@ use serde_json;
 use serde::{Deserialize, Serialize};
 use std::convert::TryFrom;
 use std::io::{Write, BufRead};
+use crate::modes::{Mode};
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
     pub input_paths: Vec<String>,
     pub output_path: String,
     pub max_backups: usize,
+    pub mode: Mode,
 }
 
 impl Config {
-    pub fn new() -> Result<Config, Box<dyn Error>> {
-        let mut config = Config { input_paths: Vec::new(), output_path: String::new(), max_backups: 3 };
-        match config.load_config() {
+    pub fn new(custom_config: &str) -> Result<Config, Box<dyn Error>> {
+        let mut config = Config { input_paths: Vec::new(), output_path: String::new(), max_backups: 3, mode: Mode::Multiple };
+        match config.load_config(custom_config) {
             Ok(_) => Ok(config),
             Err(e) => Err(e)
         }
     }
 
-    pub fn load_config(&mut self) -> Result<(), Box<dyn Error>> {
-        if Path::new(CONFIG_FILE).exists() {
-            let file = fs::File::open(CONFIG_FILE)?;
+    pub fn load_config(&mut self, custom_config: &str) -> Result<(), Box<dyn Error>> {
+        let config_path;
+        if custom_config.len() > 0 {
+            config_path = custom_config;
+        } else {
+            config_path = CONFIG_FILE;
+        }
+        if Path::new(config_path).exists() {
+            let file = fs::File::open(config_path)?;
             let buf_reader = io::BufReader::new(file);
 
             let content: Config = serde_json::from_reader(buf_reader)?;
             self.input_paths = content.input_paths;
             self.output_path = content.output_path;
             self.max_backups = content.max_backups;
+            self.mode = content.mode;
             Ok(())
         } else {
             match self.ask_for_config() {
@@ -65,10 +74,11 @@ impl Config {
     }
 
     pub fn ask_for_config(&mut self) -> Result<(), &'static str> {
-        println!("Couldn't find config file, help us create one");
+        println!("Couldn't find config file, create one:");
         self.ask_for_input();
         self.ask_for_output();
         self.ask_for_max_backups_amount();
+        self.ask_for_mode();
 
         if let Err(_) = self.save_config_to_json() {
             return Err("couldn't write config to file, config won't be saved!");
@@ -184,8 +194,38 @@ impl Config {
 
     }
 
-    pub fn load_ignores() -> Result<(Vec<String>, Vec<String>), &'static str>  {
-        return match fs::File::open(IGNORE_FILE) {
+    pub fn ask_for_mode(&mut self) {
+        let mut mode = String::new();
+        println!("Do you want to use multiple or cloud mode (m/c)?:");
+        if let Err(_) = io::stdin().read_line(&mut mode) {
+            println!("Error reading input for mode, asking again...");
+            self.ask_for_mode();
+        }
+
+        match mode.trim() {
+            "m" | "multiple" => {
+                self.mode = Mode::Multiple;
+            },
+            "c" | "cloud" => {
+                self.mode = Mode::Cloud;
+            },
+
+            _ => {
+                println!("Wrong input provided, please write 'm' for multiple mode or 'c' for cloud mode");
+                self.ask_for_mode();
+            }
+        }
+    }
+
+    pub fn load_ignores(custom_ignore: &str) -> Result<(Vec<String>, Vec<String>), &'static str>  {
+        let ignore_path;
+        if custom_ignore.len() > 0 {
+            ignore_path = custom_ignore;
+        } else {
+            ignore_path = IGNORE_FILE;
+        }
+
+        return match fs::File::open(ignore_path) {
             Err(_) => {
                 Err("No .ignore file found")
             }

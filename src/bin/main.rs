@@ -1,6 +1,7 @@
 use flash_lib::create_backup;
 
 use clap::{App, Arg};
+use std::path::Path;
 
 fn main() {
     let matches = App::new("Flash Backup")
@@ -21,18 +22,35 @@ fn main() {
             .short("m")
             .long("mode")
             .value_name("MODE")
-            .help("Sets copy mode - you can choose between multiple (m, mul, multiple) and cloud (c, cld, cloud) modes. If not provided, mode will be loaded from .config.json file"))
+            .help("Sets copy mode - you can choose between multiple (m, multiple) and cloud (c, cloud) modes. If not provided, mode will be loaded from .config.json file"))
         .get_matches();
 
     let custom_config_path = matches.value_of("config").unwrap_or("");
-    println!("Config path: {}", custom_config_path);
-
     let custom_ignore_path = matches.value_of(".ignore").unwrap_or("");
-    println!("Ignore path: {}", custom_ignore_path);
-
     let custom_mode= matches.value_of("mode").unwrap_or("");
-    println!("Mode: {}", custom_mode);
 
-    // TODO - check if values are existing files, pass custom paths to functions loading config and ignores, create function to run multiple_mode or cloud_mode based on input
-    create_backup();
+    check_args(custom_config_path, custom_ignore_path, custom_mode);
+    create_backup(custom_config_path, custom_ignore_path, custom_mode);
+}
+
+fn check_args(config: &str, ignore: &str, mode: &str) {
+    if config.len() > 0 {
+        let config_path = Path::new(config);
+        if !(config_path.exists() && config_path.is_file()) {
+            panic!("Wrong path to config file");
+        }
+    }
+
+    if ignore.len() > 0 {
+        let ignore_path = Path::new(ignore);
+        if !(ignore_path.exists() && ignore_path.is_file()) {
+            panic!("Wrong path to ignore file");
+        }
+    }
+
+    if mode.len() > 0 {
+        if !(mode == "m" || mode == "multiple" || mode == "c" || mode == "cloud") {
+            panic!("Unrecognized argument for mode selection");
+        }
+    }
 }
