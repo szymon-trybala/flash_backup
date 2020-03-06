@@ -1,4 +1,4 @@
-use crate::{FOLDER_SEPARATOR, CONFIG_FILE};
+use crate::{FOLDER_SEPARATOR, CONFIG_FILE, IGNORE_FILE};
 
 use std::io;
 use std::fs;
@@ -185,9 +185,9 @@ impl Config {
     }
 
     pub fn load_ignores() -> Result<(Vec<String>, Vec<String>), &'static str>  {
-        return match fs::File::open("ignore") {
+        return match fs::File::open(IGNORE_FILE) {
             Err(_) => {
-                Err("No ignore file found")
+                Err("No .ignore file found")
             }
             Ok(file) => {
                 let mut ignores_folders = Vec::new();
@@ -197,7 +197,7 @@ impl Config {
                 for (index, line) in reader.lines().enumerate() {
                     match line {
                         Err(_) => {
-                            println!("Couldn't read line {} of ignore file, it will be skipped", &index);
+                            println!("Couldn't read line {} of .ignore file, it will be skipped", &index);
                             continue;
                         }
                         Ok(line) => {
@@ -210,7 +210,7 @@ impl Config {
                         }
                     }
                 }
-                println!("Found {} folders and {} file extensions in ignore file", ignores_folders.len(), ignores_extensions.len());
+                println!("Found {} folders and {} file extensions in .ignore file", ignores_folders.len(), ignores_extensions.len());
                 return Ok((ignores_folders, ignores_extensions));
             }
         }

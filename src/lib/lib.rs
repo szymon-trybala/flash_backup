@@ -8,6 +8,7 @@ pub mod io;
 
 static FILE_MAP_NAME: &str = ".map.json";
 static CONFIG_FILE: &str = ".config.json";
+static IGNORE_FILE: &str = ".ignore";
 
 #[cfg(unix)]
 pub static FOLDER_SEPARATOR: &str = "/";

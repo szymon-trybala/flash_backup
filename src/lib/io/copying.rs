@@ -71,7 +71,7 @@ impl Copying {
         }
 
         if len_start == len_end {
-            println!("No folders matching ignore found");
+            println!("No folders matching .ignore found");
         } else {
             println!("Ignored {} folders and {} files in them!", folders_ignored, files_ignored);
         }
