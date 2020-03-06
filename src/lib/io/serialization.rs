@@ -20,11 +20,10 @@ pub struct Serialization {
 }
 
 impl Serialization {
-    pub fn new(paths: Vec<String>) -> Result<Serialization, &'static str> {
+    pub fn new(paths: &Vec<String>) -> Result<Serialization, &'static str> {
         let mut serialization = Serialization { metadata: Metadata::new(), map: HashMap::new()};
 
         for path in paths {
-            // Right now SHA-1 is 1/3 faster than Blake3, but it's bad implementation anyway - 25s for 300 MB file is terrible
             match generate_hash_meow(&path) {
                 Ok(hash) => {
                     serialization.map.insert(String::from(path), hash);

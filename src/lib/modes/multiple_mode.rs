@@ -11,6 +11,7 @@ use std::convert::TryFrom;
 use chrono::prelude::*;
 
 pub struct Multiple {
+    pub backup_folder: String,
     max_backups: usize,
     root_folder: String,
     backups: Vec<Metadata>
@@ -18,7 +19,7 @@ pub struct Multiple {
 
 impl Multiple {
     pub fn new(max_backups: usize, root_folder: String) -> Multiple {
-       Multiple { max_backups, root_folder, backups: Vec::new()}
+       Multiple { max_backups, root_folder, backup_folder: String::new(), backups: Vec::new()}
     }
 
     pub fn create_new_backup_folder(&mut self) -> Result<String, Box<dyn Error>> {
@@ -41,6 +42,7 @@ impl Multiple {
         let now: chrono::DateTime<Local> = Local::now();
         let date = now.format("%d-%m-%Y %H_%M_%S").to_string();
         let new_path = self.root_folder.clone() + FOLDER_SEPARATOR + date.as_str();
+        self.backup_folder = new_path.clone();
         Ok(new_path)
     }
 

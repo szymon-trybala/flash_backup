@@ -1,8 +1,8 @@
 {
   "input_paths": [
-    "/home/szymon/Downloads/1",
-    "/home/szymon/Downloads/2"
+    "C:\\Users\\Szymon\\Dropbox",
+    "C:\\Users\\Szymon\\Projekty"
   ],
-  "output_path": "/home/szymon/Downloads/OUTPUT",
+  "output_path": "C:\\Users\\Szymon\\Downloads\\OUTPUT",
   "max_backups": 3
 }

@@ -4,7 +4,13 @@ version = "0.2.0"
 authors = ["szymon-trybala"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "flash_lib"
+path = "src/lib/lib.rs"
+
+[[bin]]
+name = "flash_backup"
+path = "src/bin/main.rs"
 
 [dependencies]
 walkdir = "2.3.1"
