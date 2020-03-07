@@ -183,8 +183,15 @@ impl Config {
                     self.ask_for_max_backups_amount();
                 }
 
-                let amount: usize = amount.parse().unwrap_or(3);
-                self.max_backups = amount;
+                match amount.trim().parse::<usize>() {
+                    Ok(amount) => {
+                        self.max_backups = amount;
+                    }
+                    Err(_) => {
+                        println!("Error reading input for max backups amount, asking again...");
+                        self.ask_for_max_backups_amount();
+                    }
+                }
             }
             Err(_) => {
                 println!("Error reading input for max backups amount, asking again...");
