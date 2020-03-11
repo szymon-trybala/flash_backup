@@ -109,17 +109,17 @@ fn handle_copying(copying: &mut Copying, folder: &str) {
 }
 
 fn handle_serialization(config: &Config, copying: &Copying, folder: &str) {
-    if let Ok(mut serialization) = Serialization::new(&copying.output_files_paths) {
-        match serialization.serialize_to_json(&config.input_paths, &folder, &config.mode) {
-            Ok(_) => {
-                println!("JSON file map succesfully saved in root output folder!");
-            }
-            Err(e) => {
-                let message = String::from("Fatal error while trying to serialize maps to JSON: ") + e;
-                panic!(message);
-            }
+    // TODO - error handling in generate_map, serialize_to_json and generate_metadata!
+    let mut serialization = Serialization::new();
+    serialization.generate_map(&copying.copied_entries);
+    serialization.generate_metadata(&config.input_paths, &folder, &config.mode);
+    match serialization.serialize_to_json(folder) {
+        Ok(_) => {
+            println!("JSON file map succesfully saved in root output folder!");
         }
-    } else {
-        panic!("Fatal error while trying to create file with maps");
+        Err(e) => {
+            let message = String::from("Fatal error while trying to serialize maps to JSON: ") + e;
+            panic!(message);
+        }
     }
 }

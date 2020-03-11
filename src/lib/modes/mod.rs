@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Copy, Clone)]
 #[derive(Serialize, Deserialize)]
+#[derive(PartialEq)]
 pub enum Mode {
     Multiple,
     Cloud

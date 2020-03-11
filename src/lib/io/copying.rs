@@ -1,17 +1,17 @@
 use walkdir::{WalkDir, DirEntry};
 use std::fs;
 use std::io;
-use std::path::MAIN_SEPARATOR;
+use std::path::{MAIN_SEPARATOR};
 
 pub struct Copying {
     pub source_files_tree: Vec<Vec<DirEntry>>,
-    pub output_files_paths: Vec<String>,
+    pub copied_entries: Vec<DirEntry>,
     pub full_output_path: String,
 }
 
 impl Copying {
     pub fn new(source_folders: &Vec<String>) -> Result<Copying, &'static str> {
-        let mut copying = Copying { source_files_tree: Vec::new(), output_files_paths: Vec::new(), full_output_path: String::new() };
+        let mut copying = Copying { source_files_tree: Vec::new(), copied_entries: Vec::new(), full_output_path: String::new() };
         println!("Creating file maps...");
 
         for folder in source_folders {
@@ -137,7 +137,7 @@ impl Copying {
 
                     // Copying
                     for current_source in self.source_files_tree[i].iter() {
-                        let current_source_path = String::from(current_source.path().to_str().expect("Error converting source path (&DirEntry.path()) to &str"));
+                        let current_source_path = String::from(current_source.path().to_str().expect("Fatal error converting source path (&DirEntry.path()) to &str"));
                         let current_destination_path = current_source_path.replacen(base_input_path, base_output_path.as_str(), 1);
 
                         if current_source.path().is_dir() {
@@ -151,7 +151,6 @@ impl Copying {
                                         Ok(mut destination_file) => {
                                             match io::copy(&mut source_file, &mut destination_file) {
                                                 Ok(_) => {
-                                                    self.output_files_paths.push(current_destination_path);
                                                     copied_count += 1;
                                                 }
                                                 Err(_) => {
@@ -176,10 +175,14 @@ impl Copying {
                             }
                         }
                     }
+                    // CREATING MAP OF COPIED FILES AND FOLDERS
+                    for copied_entry in WalkDir::new(&base_output_path).into_iter().filter_map(|e| e.ok()) {
+                        self.copied_entries.push(copied_entry);
+                    }
+                    println!("Copied {} files", copied_count);
                 }
             }
         }
-        println!("Copied {} files", copied_count);
         Ok(())
     }
 }

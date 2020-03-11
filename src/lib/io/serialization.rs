@@ -3,9 +3,9 @@ use crate::io::metadata::Metadata;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs::{File};
+use std::fs::File;
 use std::io::prelude::*;
-use std::io::{BufReader};
+use std::io::BufReader;
 use hex;
 use ring::digest::{Context, SHA256};
 use digest::Digest;
@@ -13,6 +13,8 @@ use meowhash::MeowHasher;
 use uuid::Uuid;
 use chrono::prelude::*;
 use crate::modes::Mode;
+use walkdir::DirEntry;
+use std::path::Path;
 
 #[derive(Serialize, Deserialize)]
 pub struct Serialization {
@@ -21,30 +23,43 @@ pub struct Serialization {
 }
 
 impl Serialization {
-    pub fn new(paths: &Vec<String>) -> Result<Serialization, &'static str> {
-        let mut serialization = Serialization { metadata: Metadata::new(), map: HashMap::new()};
-
-        for path in paths {
-            match generate_hash_meow(&path) {
-                Ok(hash) => {
-                    serialization.map.insert(String::from(path), hash);
-                }
-                Err(_) => {
-                    println!("Couldn't calculate hash of file with path {}, skipping", path);
-                    continue;
-                }
-            }
-        }
-        Ok(serialization)
+    pub fn new() -> Serialization {
+        Serialization { metadata: Metadata::new(), map: HashMap::new() }
     }
 
-    pub fn serialize_to_json(&mut self, input_folders: &Vec<String>, save_folder: &str, mode: &Mode) -> Result<(), &'static str> {
-        self.metadata = self.generate_metadata(input_folders, &save_folder, mode);
+    pub fn generate_map(&mut self, paths: &Vec<DirEntry>) -> Result<(), &'static str> {
+        if paths.is_empty() {
+            return Err("no entries provided");
+        }
+
+        for path in paths {
+            if path.path().is_file() {
+                match generate_hash_meow(path.path()) {
+                    Ok(hash) => {
+                        self.map.insert(String::from(path.path().to_str().unwrap()), hash);
+                    }
+                    Err(_) => {
+                        println!("Couldn't calculate hash of file with path {}, skipping", path.path().to_str().unwrap());
+                        continue;
+                    }
+                }
+            } else if path.path().is_dir() {
+                self.map.insert(String::from(path.path().to_str().unwrap()), String::new());
+            }
+        }
+        Ok(())
+    }
+
+    pub fn serialize_to_json(&mut self, to: &str) -> Result<(), &'static str> {
+        let path = Path::new(to);
+        if !(path.exists() && path.is_dir()) {
+            return Err("invalid selected path to save map JSON");
+        }
 
         match serde_json::to_string_pretty(&self) {
             Err(_) => Err("Serialization to string failed"),
             Ok(json_string) => {
-                let output_path = String::from(save_folder) + FOLDER_SEPARATOR + FILE_MAP_NAME;
+                let output_path = self.metadata.output_folder.clone() + FOLDER_SEPARATOR + FILE_MAP_NAME;
                 match File::create(output_path) {
                     Err(_) => Err("Error: couldn't create JSON file with folder map!"),
                     Ok(mut file) => {
@@ -58,15 +73,20 @@ impl Serialization {
         }
     }
 
-    fn generate_metadata(&self, input_folders: &Vec<String> ,output_folder: &str, mode: &Mode) -> Metadata {
-       Metadata { id: Uuid::new_v4().to_string(), timestamp: Utc::now().timestamp(), elements: self.map.len(), mode: mode.clone(),  output_folder: output_folder.to_string(), input_folders: input_folders.clone() }
+    pub fn generate_metadata(&mut self, input_folders: &Vec<String>, output_folder: &str, mode: &Mode) {
+        self.metadata.id = Uuid::new_v4().to_string();
+        self.metadata.timestamp = Utc::now().timestamp();
+        self.metadata.elements = self.map.len();
+        self.metadata.mode = mode.clone();
+        self.metadata.output_folder = output_folder.to_string();
+        self.metadata.input_folders = input_folders.clone();
     }
 }
 
 pub fn generate_hash_sha256(path: &String) -> Result<String, &'static str> {
     match File::open(path) {
         Ok(file) => {
-           let mut reader = BufReader::new(file);
+            let mut reader = BufReader::new(file);
             let mut context = Context::new(&SHA256);
             let mut buffer = [0; 1024];
 
@@ -86,7 +106,7 @@ pub fn generate_hash_sha256(path: &String) -> Result<String, &'static str> {
     }
 }
 
-pub fn generate_hash_meow(path: &String) -> Result<String, &'static str> {
+pub fn generate_hash_meow(path: &Path) -> Result<String, &'static str> {
     match File::open(path) {
         Ok(file) => {
             let mut reader = BufReader::new(file);
