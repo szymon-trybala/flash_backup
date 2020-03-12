@@ -3,6 +3,9 @@ use crate::modes::multiple_mode::Multiple;
 use crate::io::copying::Copying;
 use crate::io::serialization::Serialization;
 use crate::modes::Mode;
+use crate::modes::cloud_mode::Cloud;
+use std::path::Path;
+use uuid::Uuid;
 
 pub mod modes;
 pub mod io;
@@ -44,8 +47,22 @@ pub fn create_backup(custom_config: &str, custom_ignore: &str, custom_mode: &str
                     handle_serialization(&config, &copying, &multiple.backup_folder[..]);
                 }
                 Mode::Cloud => {
-                    println!("Default mode in .config.json is Cloud, executing...");
-                    println!("NOT IMPLEMENTED YET");
+                    println!("Selected mode in .config.json is Cloud, executing...");
+                    let mut cloud = Cloud::new();
+                    if let Err(_) = cloud.load_existing_serialization(Path::new("/home/szymon/Downloads/DDD")) {
+                        println!("Previous backup not detected, program will copy everything");
+                        cloud.existing.metadata.output_folder = String::from("/home/szymon/Downloads/DDD");
+                        cloud.existing.metadata.id = Uuid::new_v4().to_string();
+                    }
+                    cloud.create_new_serialization(Path::new("/home/szymon/Downloads/HOPS"));
+                    if let Err(e) = cloud.generate_entries_to_copy() {
+                        let message = String::from("Error while detecting new files to copy: ") + e;
+                        panic!(message);
+                    }
+                    if let Err(e) = cloud.copy_compared() {
+                        println!("Fatal error while copying files: {}", e);
+                    }
+                    cloud.save_json();
                 }
             }
         }

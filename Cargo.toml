@@ -5,7 +5,7 @@ authors = ["szymon-trybala"]
 edition = "2018"
 
 [lib]
-name = "flash_lib"
+name = "flash_backup"
 path = "src/lib/lib.rs"
 
 [[bin]]

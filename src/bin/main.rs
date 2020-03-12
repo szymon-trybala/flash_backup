@@ -1,4 +1,4 @@
-use flash_lib::create_backup;
+use flash_backup::create_backup;
 
 use clap::{App, Arg};
 use std::path::Path;

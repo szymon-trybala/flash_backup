@@ -1,8 +1,8 @@
 {
   "input_paths": [
-    "/home/szymon/Downloads/1"
+    "/home/szymon/Downloads/HOPS"
   ],
   "output_path": "/home/szymon/Downloads/DDD",
   "max_backups": 2,
-  "mode": "Multiple"
+  "mode": "Cloud"
 }

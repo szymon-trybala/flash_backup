@@ -2,7 +2,6 @@ use crate::{FOLDER_SEPARATOR, FILE_MAP_NAME};
 use crate::io::metadata::Metadata;
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::fs::File;
 use std::io::prelude::*;
 use std::io::BufReader;
@@ -16,15 +15,29 @@ use crate::modes::Mode;
 use walkdir::DirEntry;
 use std::path::Path;
 
+#[derive(Clone)]
+#[derive(Serialize, Deserialize)]
+pub struct Entry {
+    pub path: String,
+    pub hash: String,
+    pub is_file: bool,
+}
+
+impl Entry {
+    pub fn new(path: &str, hash: &str, is_file: bool) -> Entry {
+        Entry { path: path.to_string(), hash: hash.to_string(), is_file }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 pub struct Serialization {
     pub metadata: Metadata,
-    pub map: HashMap<String, String>,   // key = path, value = hash
+    pub map: Vec<Entry>,
 }
 
 impl Serialization {
     pub fn new() -> Serialization {
-        Serialization { metadata: Metadata::new(), map: HashMap::new() }
+        Serialization { metadata: Metadata::new(), map: Vec::new() }
     }
 
     pub fn generate_map(&mut self, paths: &Vec<DirEntry>) -> Result<(), &'static str> {
@@ -36,7 +49,7 @@ impl Serialization {
             if path.path().is_file() {
                 match generate_hash_meow(path.path()) {
                     Ok(hash) => {
-                        self.map.insert(String::from(path.path().to_str().unwrap()), hash);
+                        self.map.push(Entry::new(path.path().to_str().unwrap(), &hash[..], true));
                     }
                     Err(_) => {
                         println!("Couldn't calculate hash of file with path {}, skipping", path.path().to_str().unwrap());
@@ -44,7 +57,7 @@ impl Serialization {
                     }
                 }
             } else if path.path().is_dir() {
-                self.map.insert(String::from(path.path().to_str().unwrap()), String::new());
+                self.map.push(Entry::new(path.path().to_str().unwrap(), "", false));
             }
         }
         Ok(())
@@ -83,7 +96,7 @@ impl Serialization {
     }
 }
 
-pub fn generate_hash_sha256(path: &String) -> Result<String, &'static str> {
+pub fn generate_hash_sha256(path: &Path) -> Result<String, &'static str> {
     match File::open(path) {
         Ok(file) => {
             let mut reader = BufReader::new(file);
