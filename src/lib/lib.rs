@@ -49,18 +49,31 @@ pub fn create_backup(custom_config: &str, custom_ignore: &str, custom_mode: &str
                 Mode::Cloud => {
                     println!("Selected mode in .config.json is Cloud, executing...");
                     let mut cloud = Cloud::new();
-                    if let Err(_) = cloud.load_existing_serialization(Path::new("/home/szymon/Downloads/DDD")) {
+                    if let Err(_) = cloud.load_existing_serialization(Path::new("/home/szymon/Downloads/target")) {
                         println!("Previous backup not detected, program will copy everything");
-                        cloud.existing.metadata.output_folder = String::from("/home/szymon/Downloads/DDD");
-                        cloud.existing.metadata.id = Uuid::new_v4().to_string();
+                        cloud.backup.metadata.output_folder = String::from("/home/szymon/Downloads/target");
+                        cloud.backup.metadata.id = Uuid::new_v4().to_string();
                     }
-                    cloud.create_new_serialization(Path::new("/home/szymon/Downloads/HOPS"));
-                    if let Err(e) = cloud.generate_entries_to_copy() {
-                        let message = String::from("Error while detecting new files to copy: ") + e;
+                    if let Err(e) = cloud.create_new_serialization(Path::new("/home/szymon/Downloads/source")) {
+                        let message = String::from("Fatal error while creating map of input folder: ") + e;
                         panic!(message);
                     }
+
+                    if let Err(e) = cloud.generate_entries_to_copy() {
+                        let message = String::from("Fatal error while detecting new files to copy: ") + e;
+                        panic!(message);
+                    }
+
+                    cloud.skip_root_paths();
+
+                    if let Err(e) = cloud.delete_missing() {
+                        println!("Fatal error while trying to delete missing files: {}", e);
+                        panic!();
+                    }
+
                     if let Err(e) = cloud.copy_compared() {
                         println!("Fatal error while copying files: {}", e);
+                        panic!();
                     }
                     cloud.save_json();
                 }
