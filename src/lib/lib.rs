@@ -49,12 +49,14 @@ pub fn create_backup(custom_config: &str, custom_ignore: &str, custom_mode: &str
                 Mode::Cloud => {
                     println!("Selected mode in .config.json is Cloud, executing...");
                     let mut cloud = Cloud::new();
-                    if let Err(_) = cloud.load_existing_serialization(Path::new("/home/szymon/Downloads/target")) {
+
+                    if let Err(_) = cloud.load_existing_serialization(Path::new(&config.output_path)) {
                         println!("Previous backup not detected, program will copy everything");
-                        cloud.backup.metadata.output_folder = String::from("/home/szymon/Downloads/target");
+                        cloud.backup.metadata.output_folder = config.output_path.clone();
                         cloud.backup.metadata.id = Uuid::new_v4().to_string();
                     }
-                    if let Err(e) = cloud.create_new_serialization(Path::new("/home/szymon/Downloads/source")) {
+
+                    if let Err(e) = cloud.create_new_serialization(&config.input_paths, &config.output_path) {
                         let message = String::from("Fatal error while creating map of input folder: ") + e;
                         panic!(message);
                     }
@@ -63,12 +65,10 @@ pub fn create_backup(custom_config: &str, custom_ignore: &str, custom_mode: &str
                         let message = String::from("Fatal error while detecting new files to copy: ") + e;
                         panic!(message);
                     }
-
-                    cloud.skip_root_paths();
+                    // cloud.skip_root_paths();
 
                     if let Err(e) = cloud.delete_missing() {
                         println!("Fatal error while trying to delete missing files: {}", e);
-                        panic!();
                     }
 
                     if let Err(e) = cloud.copy_compared() {
@@ -141,8 +141,8 @@ fn handle_copying(copying: &mut Copying, folder: &str) {
 fn handle_serialization(config: &Config, copying: &Copying, folder: &str) {
     // TODO - error handling in generate_map, serialize_to_json and generate_metadata!
     let mut serialization = Serialization::new();
-    serialization.generate_map(&copying.copied_entries);
-    serialization.generate_metadata(&config.input_paths, &folder, &config.mode);
+    serialization.generate_map(&config.output_path[..], &copying.copied_entries);
+    serialization.generate_metadata(&config.output_path, &config.mode);
     match serialization.serialize_to_json(folder) {
         Ok(_) => {
             println!("JSON file map succesfully saved in root output folder!");

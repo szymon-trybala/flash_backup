@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use crate::modes::Mode;
 
+#[derive(Clone)]
 #[derive(Serialize, Deserialize)]
 pub struct Metadata {
     pub id: String,
