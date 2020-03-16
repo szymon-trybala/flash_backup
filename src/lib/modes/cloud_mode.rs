@@ -8,7 +8,6 @@ use crate::modes::Mode;
 use std::io::{BufReader, BufWriter};
 use std::convert::TryFrom;
 use std::collections::HashMap;
-use std::fs::File;
 
 pub struct Cloud {
     pub backup: Serialization,
@@ -28,22 +27,26 @@ impl Cloud {
 
         // LOADING SERIALIZATION FROM FILE
         let map_path = String::from(folder.to_str().unwrap()) + MAIN_SEPARATOR.to_string().as_ref() + FILE_MAP_NAME;
+        println!("Looking for existing map in folder {}", &map_path[..]);
         let file = fs::File::open(map_path)?;
         let buf_reader = io::BufReader::new(file);
         let map: Serialization = serde_json::from_reader(buf_reader)?;
 
         self.backup = map;
         self.compared.metadata.output_folder = String::from(folder.to_str().unwrap());
+        println!("Found file map!");
         Ok(())
     }
 
     pub fn create_new_serialization(&mut self, input_paths: &Vec<String>, output_path: &str) -> Result<(), &'static str> {
+        println!("Creating maps of desired folders...");
         if input_paths.is_empty() {
             return Err("no files to copy");
         }
         self.source.metadata.output_folder = self.backup.metadata.output_folder.clone();
 
         for path in input_paths {
+            println!("Creating map of {}...", path);
             let as_path = Path::new(path);
             if !(as_path.exists() && as_path.is_dir()) {
                 return Err("invalid path of input folder");
@@ -57,12 +60,14 @@ impl Cloud {
 
             // CREATING COMPLETE SERIALIZATION STRUCT
             self.source.generate_map(&path[..], &entries);
+            println!("Map created!")
         }
         self.source.generate_metadata(output_path, &Mode::Cloud);
         Ok(())
     }
 
     pub fn generate_entries_to_copy(&mut self) -> Result<(), &'static str> {
+        println!("Looking for new or modified files and folders...");
         let mut counter: usize = 0;
         if self.source.metadata.mode != Mode::Cloud {
             return Err("map of input files is empty");
@@ -129,6 +134,7 @@ impl Cloud {
     }
 
     pub fn delete_missing(&mut self) -> Result<(), Box<dyn Error>> {
+        println!("Looking for deleted folders and files...");
         let mut deleted: usize = 0;
         if self.backup.maps.is_empty() {
             return Err(Box::try_from("no previous backup found").unwrap())
@@ -213,7 +219,7 @@ impl Cloud {
                 match fs::remove_file(&item.path) {
                     Ok(_) => entries += 1,
                     Err(e) => {
-                        println!("Error removing file {}, skipping...", &item.path);
+                        println!("Error while removing file {}: {} - skipping...", &item.path, e);
                         continue;
                     }
                 }
@@ -231,11 +237,13 @@ impl Cloud {
     }
 
     pub fn copy_compared(&mut self) -> Result<(), Box<dyn Error>> {
+        println!("Copying new or modified folders...");
         // TODO - SKIPPING ROOT OUTPUT FOLDER SHOULD BE DONE BEFORE, FIX IT
         let mut file_counter: usize = 0;
         let root_destination = self.backup.metadata.output_folder.clone();
 
         for (compared_root, comparted_entries) in &self.compared.maps {
+            println!("Copying new entries from: {}", compared_root);
             let folder_source = compared_root.clone();
             let folder_source_splitted: Vec<&str> = folder_source.split(MAIN_SEPARATOR).collect();
             let relative_root;
@@ -281,6 +289,7 @@ impl Cloud {
     }
 
     pub fn save_json(&mut self) -> Result<(), String> {
+        println!("Creating end map of copied files...");
         let mut serialization = Serialization::new();
         serialization.maps = self.source.maps.clone();
         let output = self.backup.metadata.output_folder.clone();
@@ -291,6 +300,7 @@ impl Cloud {
             let message = String::from("couldn't serialize to JSON: ") + e;
             return Err(message);
         }
+        println!("End map created!");
         Ok(())
     }
 }
