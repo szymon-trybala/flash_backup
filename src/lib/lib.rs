@@ -68,7 +68,7 @@ pub fn create_backup(custom_config: &str, custom_ignore: &str, custom_mode: &str
                     // cloud.skip_root_paths();
 
                     if let Err(e) = cloud.delete_missing() {
-                        println!("Fatal error while trying to delete missing files: {}", e);
+                        println!("No files have been deleted: {}", e);
                     }
 
                     if let Err(e) = cloud.copy_compared() {

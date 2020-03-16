@@ -13,7 +13,7 @@ use uuid::Uuid;
 use chrono::prelude::*;
 use crate::modes::Mode;
 use walkdir::DirEntry;
-use std::path::Path;
+use std::path::{Path, MAIN_SEPARATOR};
 use std::collections::HashMap;
 
 #[derive(Clone)]
@@ -126,10 +126,21 @@ impl Serialization {
         let mut modified_hashmap = HashMap::new();
         for (root, folder) in &self.maps {
             let path = root.as_str();
+            let path_splitted: Vec<&str> = path.split(MAIN_SEPARATOR).collect();
+            let path_with_folder;
+            match path_splitted.last() {
+                Some(last) => {
+                    path_with_folder = String::from(to.clone()) + MAIN_SEPARATOR.to_string().as_str() + last;
+                }
+                None => {
+                    println!("Error while converting folder paths in {}, skipping...", &to);
+                    continue;
+                }
+            }
             let mut vector = Vec::new();
             for entry in folder {
                 let mut copied_entry = entry.clone();
-                copied_entry.path = copied_entry.path.replace(path, to);
+                copied_entry.path = copied_entry.path.replace(path, &path_with_folder[..]);
                 vector.push(copied_entry);
             }
             modified_hashmap.insert(root.clone(), vector);

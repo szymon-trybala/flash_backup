@@ -8,6 +8,7 @@ use crate::modes::Mode;
 use std::io::{BufReader, BufWriter};
 use std::convert::TryFrom;
 use std::collections::HashMap;
+use std::fs::File;
 
 pub struct Cloud {
     pub backup: Serialization,
@@ -95,7 +96,8 @@ impl Cloud {
                         else {
                             let mut folder_exists = false;
                             for backup_entry in backup_entries {
-                                if !backup_entry.is_file && backup_entry.path == input_entry.path {
+                                let backup_entry_to_compare = backup_entry.path.replacen(&self.backup.metadata.output_folder, root, 1);
+                                if !backup_entry.is_file && backup_entry_to_compare == input_entry.path {
                                     folder_exists = true;
                                     break;
                                 }
@@ -110,6 +112,7 @@ impl Cloud {
                 None => {
                     // If this folder doesn't exist in backup, algorithm will copy all its content.
                     entries_to_copy.insert(root.clone(), entries.clone());
+                    counter += entries.into_iter().filter(|x| x.is_file).count();
                 }
             }
         }
@@ -128,24 +131,35 @@ impl Cloud {
     pub fn delete_missing(&mut self) -> Result<(), Box<dyn Error>> {
         let mut deleted: usize = 0;
         if self.backup.maps.is_empty() {
-            return Err(Box::try_from("backup folder is empty, no files to delete!").unwrap())
+            return Err(Box::try_from("no previous backup found").unwrap())
         }
 
         for (backup_entries_input, backup_entries) in &self.backup.maps {
             match self.source.maps.get_key_value(backup_entries_input) {
                 Some((source_root, source_entries)) => {
+                    let root = String::from(source_root);
+                    let path = root.as_str();
+                    let path_splitted: Vec<&str> = path.split(MAIN_SEPARATOR).collect();
+                    let output_to_compare;
+                    match path_splitted.last() {
+                        Some(val) => {
+                            output_to_compare = String::from(&self.backup.metadata.output_folder) + MAIN_SEPARATOR.to_string().as_str() + val;
+                        }
+                        None => {
+                            println!("Error while converting folder paths in {}, skipping...", &root);
+                            continue;
+                        }
+                    }
                     for backup_entry in backup_entries {
                         let mut found = false;
+                        let backup_entry_to_compare = backup_entry.path.replacen(&output_to_compare, source_root, 1);
                         for source_entry in source_entries {
-                            if backup_entry.path == source_entry.path {
+                            if backup_entry_to_compare == source_entry.path {
                                 found = true;
                                 break;
                             }
                         }
-                        if found {
-                            break;
-                        }
-                        else {
+                        if !found {
                             if backup_entry.is_file {
                                 if let Err(_) = fs::remove_file(&backup_entry.path) {
                                     continue;
@@ -153,7 +167,7 @@ impl Cloud {
                                 deleted += 1;
                             } else {
                                 // DELETING FOLDER AND ITS CONTENT
-                                match self.delete_folder_with_content(&backup_entries, &backup_entries_input) {
+                                match self.delete_folder_with_content(&backup_entries, &backup_entry.path) {
                                     Ok(x) => {
                                         deleted += x;
                                     }
@@ -196,8 +210,13 @@ impl Cloud {
         }
         for item in &folder_content {
             if item.is_file {
-                fs::remove_file(&item.path)?;
-                entries += 1;
+                match fs::remove_file(&item.path) {
+                    Ok(_) => entries += 1,
+                    Err(e) => {
+                        println!("Error removing file {}, skipping...", &item.path);
+                        continue;
+                    }
+                }
             } else {
                 if let Err(e) = self.delete_folder_with_content(&folder_content, &item.path) {
                     return Err(e);
@@ -210,20 +229,6 @@ impl Cloud {
         entries += 1;
         Ok(entries)
     }
-
-    // pub fn skip_root_paths(&mut self) {
-    //     if !self.source.map.is_empty() && self.source.map[0].path == self.source.metadata.output_folder {
-    //         self.source.map.remove(0);
-    //     }
-    //
-    //     if !self.backup.map.is_empty() && self.backup.map[0].path == self.backup.metadata.output_folder {
-    //         self.backup.map.remove(0);
-    //     }
-    //
-    //     if !self.compared.map.is_empty() && self.compared.map[0].path == self.source.metadata.output_folder {
-    //         self.compared.map.remove(0);
-    //     }
-    // }
 
     pub fn copy_compared(&mut self) -> Result<(), Box<dyn Error>> {
         // TODO - SKIPPING ROOT OUTPUT FOLDER SHOULD BE DONE BEFORE, FIX IT
@@ -255,11 +260,18 @@ impl Cloud {
                     let source_file = fs::File::open(&compared_entry.path)?;
                     let mut reader = BufReader::new(source_file);
 
-                    let destination_file = fs::File::create(&current_destination)?;
-                    let mut writer = BufWriter::new(destination_file);
-
-                    io::copy(&mut reader, &mut writer)?;
-                    file_counter += 1;
+                    match fs::File::create(&current_destination) {
+                        Ok(destination_file) => {
+                            let mut writer = BufWriter::new(destination_file);
+                            io::copy(&mut reader, &mut writer)?;
+                            file_counter += 1;
+                        }
+                        Err(e) => {
+                            println!("Couldn't copy file {}: {}", &compared_entry.path, e);
+                            continue;
+                            // TODO - DELETE FILE FROM MAP, ADD ERROR HANDLING FOR OTHER QUESTION MARKS
+                        }
+                    }
                 }
             }
 
