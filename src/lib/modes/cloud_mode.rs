@@ -18,7 +18,7 @@ pub struct Cloud {
 
 impl Cloud {
     pub fn new() -> Cloud {
-        Cloud { backup: Serialization::new(), source: Serialization::new(), compared: Serialization::new(), copying_error_paths: Vec::new()}
+        Cloud { backup: Serialization::new(), source: Serialization::new(), compared: Serialization::new(), copying_error_paths: Vec::new() }
     }
 
     pub fn load_existing_serialization(&mut self, folder: &Path) -> Result<(), Box<dyn Error>> {
@@ -104,8 +104,7 @@ impl Cloud {
                                 counter += 1;
                                 new_entries.push(input_entry.clone());
                             }
-                        }
-                        else if !input_entry.is_file {
+                        } else if !input_entry.is_file {
                             let mut folder_exists = false;
                             for backup_entry in backup_entries {
                                 let root_splitted: Vec<&str> = root.split(MAIN_SEPARATOR).collect();
@@ -153,7 +152,7 @@ impl Cloud {
         println!("Looking for deleted folders and files...");
         let mut deleted: usize = 0;
         if self.backup.maps.is_empty() {
-            return Err(Box::try_from("no previous backup found").unwrap())
+            return Err(Box::try_from("no previous backup found").unwrap());
         }
 
         for (backup_entries_input, backup_entries) in &self.backup.maps {
@@ -200,7 +199,6 @@ impl Cloud {
                                 }
                             }
                         }
-
                     }
                 }
                 None => {
@@ -302,7 +300,7 @@ impl Cloud {
                         Ok(destination_file) => {
                             let mut writer = BufWriter::new(destination_file);
                             if let Err(e) = io::copy(&mut reader, &mut writer) {
-                                println!("Couldn't copy file {} to destination {}: {}", &compared_entry.path,  &current_destination, e);
+                                println!("Couldn't copy file {} to destination {}: {}", &compared_entry.path, &current_destination, e);
                                 self.copying_error_paths.push(current_destination.clone());
                             }
                             file_counter += 1;
@@ -316,7 +314,6 @@ impl Cloud {
                     }
                 }
             }
-
         }
         if file_counter > 0 {
             println!("Copied {} files", file_counter);
@@ -347,5 +344,77 @@ impl Cloud {
         }
         println!("End map created!");
         Ok(())
+    }
+
+    pub fn exclude_files_with_extensions(&mut self, extensions: &Vec<String>) -> Result<(), &'static str> {
+        if self.source.maps.is_empty() {
+            return Err("file tree is empty");
+        }
+        println!("Starting excluding files with selected extensions...");
+
+        let mut excluded_total: usize = 0;
+        let mut map = HashMap::new();
+
+        for (path, folder) in &self.source.maps {
+            let mut filtered_entries = folder.clone();
+            let mut excluded_in_folder: usize = 0;
+            let start_len = filtered_entries.len();
+
+            for entry in extensions {
+                filtered_entries.retain(|x| !(x.is_file && x.path.ends_with(entry)));
+            }
+            excluded_in_folder += (start_len - filtered_entries.len());
+            if excluded_in_folder > 2 {
+                excluded_in_folder -= 1;
+            }
+            excluded_total += excluded_in_folder;
+            map.insert(path.clone(), filtered_entries);
+        }
+        self.source.maps = map;
+        match excluded_total {
+            0 => println!("No files with selected extensions to exclude"),
+            _ => println!("Excluded {} files from input folders", excluded_total),
+        }
+        Ok(())
+    }
+
+    pub fn exclude_folders(&mut self, folders: &Vec<String>) -> Result<(), &'static str> {
+        // TODO - ADD MULTITHREADING
+        if self.source.maps.is_empty() {
+            return Err("folder tree is empty");
+        }
+        println!("Starting excluding folders...");
+
+        let mut folders_ignored: usize = 0;
+        let mut files_ignored: usize = 0;
+        let mut filtered_maps = HashMap::new();
+
+        for (path, folder) in &self.source.maps {
+            let mut filtered_entries = folder.clone();
+            let folders_start = filtered_entries.iter().filter(|x| !x.is_file).count();
+            let files_start = filtered_entries.iter().filter(|x| x.is_file).count();
+
+            for entry in folders {
+                let folders_to_exclude: Vec<Entry> = filtered_entries.clone().into_iter().filter(|x| !x.is_file && x.path.contains(entry)).collect();
+                // Excluding folders
+                filtered_entries.retain(|x| !(!x.is_file && x.path.contains(entry)));
+                // Excluding files in excluded folders
+                for folder_to_exclude in folders_to_exclude {
+                    filtered_entries.retain(|x| !(x.path.starts_with(&folder_to_exclude.path)));
+                }
+            }
+
+            folders_ignored += (folders_start - filtered_entries.iter().filter(|x| !x.is_file).count());
+            files_ignored += (files_start - filtered_entries.iter().filter(|x| x.is_file).count());
+            filtered_maps.insert(path.clone(), filtered_entries);
+        }
+        self.source.maps = filtered_maps;
+        if folders_ignored == 0 {
+            println!("No folders matching .ignore found");
+        } else {
+            println!("Ignored {} folders and {} files in them", folders_ignored, files_ignored);
+        }
+        Ok(())
+
     }
 }

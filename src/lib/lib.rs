@@ -61,6 +61,24 @@ pub fn create_backup(custom_config: &str, custom_ignore: &str, custom_mode: &str
                         panic!(message);
                     }
 
+                    match Config::load_ignores(custom_ignore) {
+                        Err(e) => {
+                            println!("{}", &e);
+                        }
+                        Ok(ignores) => {
+                            if ignores.0.len() > 0 {
+                                if let Err(e) = cloud.exclude_folders(&ignores.0) {
+                                    println!("Error while excluding folders, everything will be copied: {}", e);
+                                }
+                            }
+                            if ignores.1.len() > 0 {
+                                if let Err(e) = cloud.exclude_files_with_extensions(&ignores.1) {
+                                    println!("Error while excluding files with selected extensions, everything will be copied: {}", e);
+                                }
+                            }
+                        }
+                    }
+
                     if let Err(e) = cloud.generate_entries_to_copy() {
                         println!("{}", e);
                     }

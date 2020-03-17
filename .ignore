@@ -1,9 +1,3 @@
-\.git
-\.idea
-\bin
-\target
-\node_modules
-\.vscode
-\obj
-\.dropbox.cache
-.7z
+.txt
+/obj
+/Models
