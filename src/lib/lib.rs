@@ -62,10 +62,8 @@ pub fn create_backup(custom_config: &str, custom_ignore: &str, custom_mode: &str
                     }
 
                     if let Err(e) = cloud.generate_entries_to_copy() {
-                        let message = String::from("Fatal error while detecting new files to copy: ") + e;
-                        panic!(message);
+                        println!("{}", e);
                     }
-                    // cloud.skip_root_paths();
 
                     if let Err(e) = cloud.delete_missing() {
                         println!("No files have been deleted: {}", e);
@@ -75,7 +73,10 @@ pub fn create_backup(custom_config: &str, custom_ignore: &str, custom_mode: &str
                         println!("Fatal error while copying files: {}", e);
                         panic!();
                     }
-                    cloud.save_json();
+                    if let Err(e) = cloud.save_json() {
+                        println!("Fatal error while creating json map: {}", e);
+                        panic!();
+                    }
                 }
             }
         }
@@ -141,7 +142,10 @@ fn handle_copying(copying: &mut Copying, folder: &str) {
 fn handle_serialization(config: &Config, copying: &Copying, folder: &str) {
     // TODO - error handling in generate_map, serialize_to_json and generate_metadata!
     let mut serialization = Serialization::new();
-    serialization.generate_map(&config.output_path[..], &copying.copied_entries);
+    if let Err(e) = serialization.generate_map(&config.output_path[..], &copying.copied_entries) {
+        println!("Fatal error while generating maps: {}", e);
+        panic!();
+    }
     serialization.generate_metadata(&config.output_path, &config.mode);
     match serialization.serialize_to_json(folder) {
         Ok(_) => {

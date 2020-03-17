@@ -77,8 +77,15 @@ impl Config {
         println!("Couldn't find config file, create one:");
         self.ask_for_input();
         self.ask_for_output();
-        self.ask_for_max_backups_amount();
         self.ask_for_mode();
+        match self.mode {
+            Mode::Cloud => {
+                self.max_backups = 1;
+            }
+            Mode::Multiple => {
+                self.ask_for_max_backups_amount();
+            }
+        }
 
         if let Err(_) = self.save_config_to_json() {
             return Err("couldn't write config to file, config won't be saved!");
@@ -90,7 +97,8 @@ impl Config {
         let trimmed = path_raw.trim();
         if !Path::new(&trimmed).exists() {
             return Err("this input path doesn't exist");
-        } else {
+        }
+        else {
             self.input_paths.push(String::from(trimmed));
         }
         Ok(())

@@ -13,11 +13,12 @@ pub struct Cloud {
     pub backup: Serialization,
     pub source: Serialization,
     pub compared: Serialization,
+    pub copying_error_paths: Vec<String>,
 }
 
 impl Cloud {
     pub fn new() -> Cloud {
-        Cloud { backup: Serialization::new(), source: Serialization::new(), compared: Serialization::new()}
+        Cloud { backup: Serialization::new(), source: Serialization::new(), compared: Serialization::new(), copying_error_paths: Vec::new()}
     }
 
     pub fn load_existing_serialization(&mut self, folder: &Path) -> Result<(), Box<dyn Error>> {
@@ -57,9 +58,15 @@ impl Cloud {
             for copied_entry in WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
                 entries.push(copied_entry);
             }
+            if entries.len() <= 1 {
+                return Err("one of input folders is empty");
+            }
 
             // CREATING COMPLETE SERIALIZATION STRUCT
-            self.source.generate_map(&path[..], &entries);
+            if let Err(e) = self.source.generate_map(&path[..], &entries) {
+                println!("Fatal error while creating file map: {}", e);
+                panic!();
+            }
             println!("Map created!")
         }
         self.source.generate_metadata(output_path, &Mode::Cloud);
@@ -81,7 +88,7 @@ impl Cloud {
 
         for (root, entries) in &self.source.maps {
             match self.backup.maps.get_key_value(root) {
-                Some((backup_key, backup_entries)) => {
+                Some((_, backup_entries)) => {
                     // This folder exists in backup, checking if there are new files
                     let mut new_entries = Vec::new();
                     for input_entry in entries {
@@ -98,11 +105,18 @@ impl Cloud {
                                 new_entries.push(input_entry.clone());
                             }
                         }
-                        else {
+                        else if !input_entry.is_file {
                             let mut folder_exists = false;
                             for backup_entry in backup_entries {
-                                let backup_entry_to_compare = backup_entry.path.replacen(&self.backup.metadata.output_folder, root, 1);
-                                if !backup_entry.is_file && backup_entry_to_compare == input_entry.path {
+                                let root_splitted: Vec<&str> = root.split(MAIN_SEPARATOR).collect();
+                                let last = root_splitted.last();
+                                let output_folder_with_last;
+                                match last {
+                                    Some(last) => output_folder_with_last = String::from(&self.backup.metadata.output_folder) + MAIN_SEPARATOR.to_string().as_str() + last,
+                                    None => output_folder_with_last = String::from(&self.backup.metadata.output_folder)
+                                }
+                                let backup_entry_to_compare = backup_entry.path.replacen(&output_folder_with_last, root.as_str(), 1);
+                                if backup_entry_to_compare == input_entry.path {
                                     folder_exists = true;
                                     break;
                                 }
@@ -112,7 +126,9 @@ impl Cloud {
                             }
                         }
                     }
-                    entries_to_copy.insert(root.clone(), new_entries);
+                    if new_entries.len() > 0 {
+                        entries_to_copy.insert(root.clone(), new_entries);
+                    }
                 }
                 None => {
                     // If this folder doesn't exist in backup, algorithm will copy all its content.
@@ -123,7 +139,7 @@ impl Cloud {
         }
 
         match entries_to_copy.is_empty() {
-            true => Err("no new files or folders"),
+            true => Err("No new files or folders!"),
             false => {
                 println!("Detected {} entries to copy", counter);
                 self.compared.maps = entries_to_copy;
@@ -201,7 +217,9 @@ impl Cloud {
                 }
             }
         }
-        println!("Deleted {} redundant entries", deleted);
+        if deleted > 0 {
+            println!("Deleted {} redundant entries", deleted);
+        }
         Ok(())
     }
 
@@ -238,11 +256,14 @@ impl Cloud {
 
     pub fn copy_compared(&mut self) -> Result<(), Box<dyn Error>> {
         println!("Copying new or modified folders...");
-        // TODO - SKIPPING ROOT OUTPUT FOLDER SHOULD BE DONE BEFORE, FIX IT
+
         let mut file_counter: usize = 0;
         let root_destination = self.backup.metadata.output_folder.clone();
 
         for (compared_root, comparted_entries) in &self.compared.maps {
+            if comparted_entries.is_empty() {
+                continue;
+            }
             println!("Copying new entries from: {}", compared_root);
             let folder_source = compared_root.clone();
             let folder_source_splitted: Vec<&str> = folder_source.split(MAIN_SEPARATOR).collect();
@@ -268,30 +289,54 @@ impl Cloud {
                     let source_file = fs::File::open(&compared_entry.path)?;
                     let mut reader = BufReader::new(source_file);
 
+                    // Creating parent folder in case it doesn't exist
+                    let current_destination_splitted: Vec<&str> = current_destination.as_str().split(MAIN_SEPARATOR).collect();
+                    let current_destination_folder = current_destination.trim_end_matches(current_destination_splitted.last().unwrap());
+                    if !Path::new(current_destination_folder).exists() {
+                        if let Err(e) = fs::create_dir_all(current_destination_folder) {
+                            println!("Couldn't create folder: {}: {}", &current_destination_folder, e);
+                        }
+                    }
+
                     match fs::File::create(&current_destination) {
                         Ok(destination_file) => {
                             let mut writer = BufWriter::new(destination_file);
-                            io::copy(&mut reader, &mut writer)?;
+                            if let Err(e) = io::copy(&mut reader, &mut writer) {
+                                println!("Couldn't copy file {} to destination {}: {}", &compared_entry.path,  &current_destination, e);
+                                self.copying_error_paths.push(current_destination.clone());
+                            }
                             file_counter += 1;
                         }
                         Err(e) => {
-                            println!("Couldn't copy file {}: {}", &compared_entry.path, e);
+                            println!("Couldn't create file {}: {}", &compared_entry.path, e);
+                            // Deleting file from map
+                            self.copying_error_paths.push(compared_entry.path.clone());
                             continue;
-                            // TODO - DELETE FILE FROM MAP, ADD ERROR HANDLING FOR OTHER QUESTION MARKS
                         }
                     }
                 }
             }
 
         }
-        println!("Copied {} files", file_counter);
+        if file_counter > 0 {
+            println!("Copied {} files", file_counter);
+        }
         Ok(())
     }
 
     pub fn save_json(&mut self) -> Result<(), String> {
         println!("Creating end map of copied files...");
         let mut serialization = Serialization::new();
-        serialization.maps = self.source.maps.clone();
+        let source_maps = self.source.maps.clone();
+
+        for map in source_maps {
+            let mut entries_without_errors = map.1.clone();
+            for copying_error_path in &self.copying_error_paths {
+                entries_without_errors.retain(|x| x.path != copying_error_path.as_str());
+            }
+            serialization.maps.insert(map.0.clone(), entries_without_errors);
+        }
+
         let output = self.backup.metadata.output_folder.clone();
         serialization.replace_in_paths(&output);
 
