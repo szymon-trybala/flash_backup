@@ -19,6 +19,8 @@ impl Copying {
             for entry in WalkDir::new(&folder).into_iter().filter_map(|e| e.ok()) {
                 map.push(entry);
             }
+            // Skipping OneDrive temp file
+            map.retain(|x| x.path().file_name().unwrap() != ".849C9593-D756-4E56-8D6E-42412F2A707B");
             if map.len() > 0 {
                 copying.source_files_tree.push(map);
             }
@@ -37,16 +39,15 @@ impl Copying {
         if self.source_files_tree.is_empty() {
             return Err("folder tree is empty");
         }
-
         println!("Starting excluding folders...");
 
-        let mut len_start: usize = 0;
-        let mut len_end: usize = 0;
         let mut folders_ignored: usize = 0;
         let mut files_ignored: usize = 0;
 
         for i in 0..self.source_files_tree.len() {
-            len_start = self.source_files_tree[i].len();
+            let files_start: usize = self.source_files_tree[i].iter().filter(|x| x.path().is_file()).count();
+            let folder_start: usize = self.source_files_tree[i].iter().filter(|x| x.path().is_dir()).count();
+
             for entry in folders {
                 // Collecting folders to exclude
                 let folders_to_exclude: Vec<DirEntry> = self.source_files_tree[i].iter().
@@ -57,20 +58,17 @@ impl Copying {
                 // Excluding folders
                 self.source_files_tree[i].retain(|x| !(x.path().exists() && x.path().is_dir()
                     && x.path().to_str().expect("Fatal error while excluding folders").contains(entry.as_str())));
-                let len_temp = self.source_files_tree[i].len();
-                folders_ignored += len_start - len_temp;
 
                 // Excluding files in excluded folders
                 for folder in folders_to_exclude {
                     self.source_files_tree[i].retain(|x| !(x.path().starts_with(folder.path())));
                 }
-                files_ignored += len_temp - self.source_files_tree[i].len();
-
             }
-            len_end += self.source_files_tree[i].len();
+            folders_ignored += folder_start - self.source_files_tree[i].iter().filter(|x| x.path().is_dir()).count();
+            files_ignored += files_start - self.source_files_tree[i].iter().filter(|x| x.path().is_file()).count();
         }
 
-        if len_start == len_end {
+        if folders_ignored == 0 {
             println!("No folders matching .ignore found");
         } else {
             println!("Ignored {} folders and {} files in them!", folders_ignored, files_ignored);
@@ -119,12 +117,13 @@ impl Copying {
 
         println!("Starting copying files...");
         for i in 0..self.source_files_tree.len() {
+            let current_folder_path = String::from(to) + MAIN_SEPARATOR.to_string().as_str() + self.source_files_tree[i][0].file_name().to_str().unwrap();
+            println!("Copying from folder {}", &current_folder_path);
             if self.source_files_tree[i].is_empty() {
                 println!("Folder subtree is empty, skipping");
                 continue;
             }
 
-            let current_folder_path = String::from(to) + MAIN_SEPARATOR.to_string().as_str() + self.source_files_tree[i][0].file_name().to_str().unwrap();
             match fs::create_dir_all(&current_folder_path) {
                 Err(_) => {
                     return Err("couldn't create folder to copy files");
@@ -149,6 +148,7 @@ impl Copying {
                                 Ok(mut source_file) => {
                                     match fs::File::create(&current_destination_path) {
                                         Ok(mut destination_file) => {
+                                            println!("Copying file: {}", &current_source_path);
                                             match io::copy(&mut source_file, &mut destination_file) {
                                                 Ok(_) => {
                                                     copied_count += 1;
@@ -166,11 +166,13 @@ impl Copying {
                                         }
                                         Err(_) => {
                                             println!("Error creating file: {}", &current_destination_path);
+                                            continue;
                                         }
                                     }
                                 }
                                 Err(_) => {
                                     println!("Error reading source file: {}", &current_source_path);
+                                    continue;
                                 }
                             }
                         }
@@ -179,10 +181,11 @@ impl Copying {
                     for copied_entry in WalkDir::new(&base_output_path).into_iter().filter_map(|e| e.ok()) {
                         self.copied_entries.push(copied_entry);
                     }
-                    println!("Copied {} files", copied_count);
                 }
             }
+            println!("Copied!");
         }
+        println!("Copied {} files", copied_count);
         Ok(())
     }
 }

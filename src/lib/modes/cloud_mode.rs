@@ -298,6 +298,7 @@ impl Cloud {
 
                     match fs::File::create(&current_destination) {
                         Ok(destination_file) => {
+                            println!("Copying file: {}", &compared_entry.path);
                             let mut writer = BufWriter::new(destination_file);
                             if let Err(e) = io::copy(&mut reader, &mut writer) {
                                 println!("Couldn't copy file {} to destination {}: {}", &compared_entry.path, &current_destination, e);
@@ -363,7 +364,7 @@ impl Cloud {
             for entry in extensions {
                 filtered_entries.retain(|x| !(x.is_file && x.path.ends_with(entry)));
             }
-            excluded_in_folder += (start_len - filtered_entries.len());
+            excluded_in_folder += start_len - filtered_entries.len();
             if excluded_in_folder > 2 {
                 excluded_in_folder -= 1;
             }
@@ -404,8 +405,8 @@ impl Cloud {
                 }
             }
 
-            folders_ignored += (folders_start - filtered_entries.iter().filter(|x| !x.is_file).count());
-            files_ignored += (files_start - filtered_entries.iter().filter(|x| x.is_file).count());
+            folders_ignored += folders_start - filtered_entries.iter().filter(|x| !x.is_file).count();
+            files_ignored += files_start - filtered_entries.iter().filter(|x| x.is_file).count();
             filtered_maps.insert(path.clone(), filtered_entries);
         }
         self.source.maps = filtered_maps;
