@@ -10,4 +10,5 @@ pub static S_CONFIG: &str = ".config.json";
 pub static S_IGNORE: &str = ".ignore";
 
 // TODO - REMOVE ALL PUB AFTER CREATING DOCUMENTATION
+// TODO - CREATE NICE README
 

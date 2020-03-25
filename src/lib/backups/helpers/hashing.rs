@@ -7,11 +7,11 @@ use digest::Digest;
 /// Function generate hash of a file and return it as a string. Uses meow_hash, extremally fast non-cryptographic hasing method. This method of hashing is prefered in Flash Backup.
 /// Returns error if file to which the path leads doesn't exist or is empty, exists but can't be opened, or if an error occurs during hashing.
 // TODO - add test
-pub fn generate_hash_meow_hash(path: &String) -> Result<String, &'static str> {
+pub fn generate_hash_meow_hash(path: &String) -> Result<String, String> {
     let as_path = Path::new(path);
     if !(as_path.exists() && as_path.is_file()) {
         let message = format!("Path {} doesn't exist or isn't a file", path);
-        return Err(&message);
+        return Err(message);
     }
 
     match File::open(path) {
@@ -30,7 +30,7 @@ pub fn generate_hash_meow_hash(path: &String) -> Result<String, &'static str> {
                     }
                     Err(e) => {
                         let message = format!("Couldn't hash file {}: {}", path, e);
-                        return Err(&message);
+                        return Err(message);
                     }
                 }
             }
@@ -39,7 +39,7 @@ pub fn generate_hash_meow_hash(path: &String) -> Result<String, &'static str> {
         }
         Err(e) => {
             let message = format!("Couldn't open file {} to generate its hash: {}", path, e);
-            Err(&message)
+            Err(message)
         }
     }
 }
