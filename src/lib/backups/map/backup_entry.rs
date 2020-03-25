@@ -1,3 +1,4 @@
+#[derive(Clone)]
 pub struct BackupEntry {
     pub input_path: String,
     pub output_path: String,

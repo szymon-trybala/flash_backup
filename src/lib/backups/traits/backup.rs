@@ -1,3 +1,3 @@
 pub trait Backup {
-    fn backup(&mut self) -> Result<(), &'static str>;
+    fn backup(&mut self) -> Result<(), String>;
 }

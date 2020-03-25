@@ -4,7 +4,6 @@ use walkdir::WalkDir;
 use crate::backups::map::backup_entry::BackupEntry;
 use crate::backups::helpers::hashing::generate_hash_meow_hash;
 use std::sync::{Arc, Mutex};
-use std::thread;
 use std::borrow::BorrowMut;
 use scoped_threadpool::Pool;
 
@@ -41,7 +40,7 @@ mod tests {
 
     #[test]
     fn test_all() {
-        let paths = vec![String::from("/usr/bin/core_perl"), String::from("/usr/share/alsa"), String::from("/usr/share/gtk-doc"), String::from("/usr/share/help"), String::from("/usr/lib32/pulseaudio")];
+        let paths = vec![String::from("/usr/bin/X11"), String::from("/usr/share/alsa"), String::from("/usr/share/gtk-doc"), String::from("/usr/share/help"), String::from("/usr/share/pulseaudio")];
         let dirs = check_input_folders(&paths);
         let dirs = Arc::new(Mutex::new(dirs));
         let dirs = fill_backup_dirs_parallel(dirs);
