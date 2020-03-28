@@ -6,10 +6,12 @@ use crate::backups::helpers::hashing::generate_hash_meow_hash;
 use std::sync::{Arc, Mutex};
 use std::borrow::BorrowMut;
 use scoped_threadpool::Pool;
+use crate::backups::helpers::multithreading::arc_to_inner;
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::backups::helpers::multithreading::arc_to_inner;
 
     #[test]
     fn test_check_input_folders() {
@@ -60,7 +62,8 @@ pub trait BackupInput {
     /// Example (only for Linux, test may fail if your /usr/include/bash is different):
     /// ```
     /// use std::sync::{Arc, Mutex};
-    /// use flash_backup::backups::traits::backup_input::{check_input_folders, fill_backup_dirs_parallel, arc_to_inner};
+    /// use flash_backup::backups::traits::backup_input::{check_input_folders, fill_backup_dirs_parallel};
+    /// use flash_backup::backups::helpers::multithreading::arc_to_inner;
     /// let dir = check_input_folders(&vec![String::from("/usr/include/bash")]);
     /// let mut backup_dirs = Arc::new(Mutex::new(dir));
     /// let dir = fill_backup_dirs_parallel(backup_dirs);
@@ -146,12 +149,12 @@ pub fn fill_backup_dirs_parallel(dirs: Arc<Mutex<Vec<BackupDir>>>) -> Arc<Mutex<
     // Checking input
     let dirs_ref = Arc::clone(&dirs);
     if dirs_ref.lock().unwrap().is_empty() {
-        println!("All input dirs are empty!");
+        println!("No dirs to fill provided!");
         return dirs;
     }
 
     // Creating threads and executing fill_single_backup_dir function on every of them
-    println!("Creating maps");
+    println!("Creating maps...");
     let len = dirs_ref.lock().unwrap().len();
     let max_threads = num_cpus::get();
     let mut thread_pool = Pool::new(max_threads as u32);
@@ -221,34 +224,5 @@ pub fn fill_single_backup_dir(dir: &mut BackupDir) {
         println!("Couldn't find any entries in {}", &dir.root_input);
     } else {
         println!("Found {} files and {} folders in {}", dir.files, dir.folders, &dir.root_input)
-    }
-}
-
-/// Unwraps consumed Arc<Mutex<Vec<BackupDir>>> (first Arc to Mutex, then Mutex to Vec) and returns owned Vec<BackupDir> or an error if Vec couldn't be acquired.
-/// # Example (works only on Linux, test may fail if your /usr/include/bash is different):
-/// ```
-/// use flash_backup::backups::map::backup_dir::BackupDir;
-/// use std::sync::{Arc, Mutex};
-/// use flash_backup::backups::traits::backup_input::arc_to_inner;
-///
-/// let dirs = vec![BackupDir { root_input: String::from("/usr/include/bash"), root_output: String::new(), files: 0, folders: 0, backup_entries: vec![] }];
-/// let backup_dirs = Arc::new(Mutex::new(dirs));
-/// let backup_dirs = arc_to_inner(backup_dirs).unwrap();
-/// assert_eq!(backup_dirs[0].root_input, "/usr/include/bash");
-/// ```
-pub fn arc_to_inner(arc: Arc<Mutex<Vec<BackupDir>>>) -> Result<Vec<BackupDir>, String> {
-    match Arc::try_unwrap(arc) {
-        Ok(mutex) => {
-            match mutex.into_inner() {
-                Ok(dir) => {
-                    Ok(dir)
-                }
-                Err(e) => {
-                    let message = format!("Couldn't unwrap Mutex to inner: {}", e);
-                    Err(message)
-                }
-            }
-        }
-        Err(_) => Err(String::from("Couldn't unwrap Arc to Mutex"))
     }
 }
