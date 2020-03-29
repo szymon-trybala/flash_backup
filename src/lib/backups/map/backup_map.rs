@@ -2,13 +2,13 @@ use crate::backups::map::backup_mode::BackupMode;
 use crate::backups::map::backup_dir::BackupDir;
 
 pub struct BackupMap {
-    id: String,
-    timestamp: usize,
-    backup_mode: BackupMode,
-    files: usize,
-    folders: usize,
-    output_folder: String,
-    input_folders: String,
+    pub id: String,
+    pub timestamp: usize,
+    pub backup_mode: BackupMode,
+    pub files: usize,
+    pub folders: usize,
+    pub output_folder: String,
+    pub input_folders: String,
     pub backup_dirs: Vec<BackupDir>
 }
 

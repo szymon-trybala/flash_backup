@@ -1,6 +1,7 @@
 use crate::backups::traits::backup_input::BackupInput;
 use crate::backups::traits::backup_ignore::BackupIgnore;
 use crate::backups::map::backup_map::BackupMap;
+use crate::backups::traits::backup_copy::BackupCopy;
 
 pub struct BackupCloud {
     pub map: BackupMap
@@ -18,3 +19,4 @@ impl BackupCloud {
 
 impl BackupInput for BackupCloud {}
 impl BackupIgnore for BackupCloud {}
+impl BackupCopy for BackupCloud {}

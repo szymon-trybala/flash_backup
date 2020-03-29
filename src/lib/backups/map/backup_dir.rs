@@ -1,5 +1,6 @@
 use crate::backups::map::backup_entry::BackupEntry;
 
+#[derive(Clone)]
 pub struct BackupDir {
     pub root_input: String,
     pub root_output: String,
