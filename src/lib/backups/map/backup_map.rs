@@ -9,7 +9,7 @@ pub struct BackupMap {
     folders: usize,
     output_folder: String,
     input_folders: String,
-    backup_dirs: Vec<BackupDir>
+    pub backup_dirs: Vec<BackupDir>
 }
 
 impl BackupMap {

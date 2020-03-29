@@ -94,6 +94,8 @@ pub trait BackupInput {
 
 /// Returns Vec<Backup_Dir> filled with Backup_Dir for every passed valid and non-empty path, only present field in Backup_Dir's is root_input.
 ///
+/// Used by flash_backup::backups::traits::backup_input::BackupInput::create_input_maps
+///
 /// Panics if there are no valid and non-empty input folders - there is no point of continuing the program if this happens
 /// # Example (works only on Linux, test may fail if your system doesn't have /usr/include/bash):
 /// ```
@@ -125,6 +127,8 @@ pub fn check_input_folders(folders: &Vec<String>) -> Vec<BackupDir> {
 }
 
 /// Fills data in every BackupDir concurrently - one thread per one folder with maximum amount of present threads equal to amount of threads in computer.
+///
+/// Used by flash_backup::backups::traits::backup_input::BackupInput::create_input_maps
 ///
 /// Function handles creating threads, and then for every one of them it executes fill_single_backup_dir - for further info check its documentation.
 ///
@@ -171,6 +175,8 @@ pub fn fill_backup_dirs_parallel(dirs: Arc<Mutex<Vec<BackupDir>>>) -> Arc<Mutex<
 }
 
 /// Fills data of one BackupDir.
+///
+/// Used by flash_backup::backups::traits::backup_input::BackupInput::create_input_maps
 ///
 /// **FUNCTION ASSUMS THAT root_input IS ALREADY FILLED, if it isn't, it doesn't modify directory (and informs user about it)**
 /// Filled fields: folders, files, backup_entries (function creates Vec of BackupEntry, each one has input_path, is_file and hash filled).
