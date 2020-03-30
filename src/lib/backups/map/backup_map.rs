@@ -1,6 +1,8 @@
 use crate::backups::map::backup_mode::BackupMode;
 use crate::backups::map::backup_dir::BackupDir;
+use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize)]
 pub struct BackupMap {
     pub id: String,
     pub timestamp: usize,

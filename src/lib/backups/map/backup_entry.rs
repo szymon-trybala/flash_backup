@@ -1,3 +1,6 @@
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize)]
 #[derive(Clone)]
 pub struct BackupEntry {
     pub input_path: String,

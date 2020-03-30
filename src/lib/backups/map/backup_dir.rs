@@ -1,5 +1,7 @@
 use crate::backups::map::backup_entry::BackupEntry;
+use serde::{Deserialize, Serialize};
 
+#[derive(Serialize, Deserialize)]
 #[derive(Clone)]
 pub struct BackupDir {
     pub root_input: String,
