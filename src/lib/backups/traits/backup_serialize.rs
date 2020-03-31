@@ -1,6 +1,4 @@
 use crate::backups::map::backup_map::BackupMap;
-use uuid::Uuid;
-use chrono::Utc;
 use std::path::{Path, MAIN_SEPARATOR};
 use crate::S_MAP;
 use std::fs::{File, remove_file};
@@ -20,7 +18,7 @@ pub trait BackupSerialize {
         }
         // Generating metadata, serializing
         println!("Saving folder map to JSON file...");
-        generate_metadata(map);
+        map.generate_metadata();
         match serde_json::to_string_pretty(map) {
             Err(e) => {
                 let message = format!("Can't convert data to text: {}", e);
@@ -124,12 +122,4 @@ pub fn verify_one_folder(folder: &BackupDir) -> Result<usize, String> {
             Err(message)
         }
     }
-}
-
-/// BackupMode has been already filled
-pub fn generate_metadata(map: &mut BackupMap) {
-    map.id = Uuid::new_v4().to_string();
-    map.timestamp = Utc::now().timestamp() as usize;
-    map.files = map.backup_dirs.iter().map(|x| x.files).sum();
-    map.folders = map.backup_dirs.iter().map(|x| x.folders).sum();
 }

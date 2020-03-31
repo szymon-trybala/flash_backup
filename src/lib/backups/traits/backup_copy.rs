@@ -1,5 +1,5 @@
 use crate::backups::map::backup_entry::BackupEntry;
-use std::path::{MAIN_SEPARATOR, Path};
+use std::path::{Path};
 use std::fs;
 use std::io::{BufReader, BufWriter};
 use crate::backups::map::backup_dir::BackupDir;
@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use scoped_threadpool::Pool;
 use std::borrow::BorrowMut;
 use crate::backups::helpers::multithreading::arc_to_inner;
+use crate::backups::helpers::dirs::get_last_subdir;
 
 #[cfg(test)]
 mod tests {
@@ -33,6 +34,7 @@ pub trait BackupCopy {
             println!("No dirs to copy provided");
             return dirs;
         }
+        println!("Copying files...");
         // Creating necessary variables
         let len = dirs.len();
         let dirs = Arc::new(Mutex::new(dirs));
@@ -70,6 +72,7 @@ pub fn copy_folder(folder: &mut BackupDir) -> Result<(), String> {
         return Err(message);
     }
 
+    println!("Copying folder {}...", &folder.root_input);
     let mut copied_entries = vec![];
 
     for entry in &folder.backup_entries {
@@ -108,6 +111,7 @@ pub fn copy_folder(folder: &mut BackupDir) -> Result<(), String> {
             folder.backup_entries = copied_entries;
             folder.files = folder.backup_entries.iter().filter(|x| x.is_file).count();
             folder.folders = folder.backup_entries.iter().filter(|x| !x.is_file).count();
+            println!("Copied {} folders and {} files from folder {}", folder.folders, folder.files, &folder.root_input);
             Ok(())
         }
     }
@@ -174,14 +178,13 @@ pub fn create_parent_folder(file_path: &String) -> Result<(), String> {
     }
 
     // Extracting parent folder
-    let file_path_splitted: Vec<&str> = file_path.as_str().split(MAIN_SEPARATOR).collect();
-    match file_path_splitted.last() {
-        None => {
-            let message = format!("Couldn't create parent folder to file: {}", file_path);
+    match get_last_subdir(file_path) {
+        Err(e) => {
+            let message = format!("Couldn't create parent folder to file {}: {}", file_path, e);
             return Err(message);
         }
-        Some(file_path_last) => {
-            let file_parent_folder = file_path.trim_end_matches(file_path_last);
+        Ok(file_path_last) => {
+            let file_parent_folder = file_path.trim_end_matches(&file_path_last);
             // Creating folder if it doesn't exist
             if !Path::new(file_parent_folder).exists() {
                 if let Err(e) = fs::create_dir_all(file_parent_folder) {

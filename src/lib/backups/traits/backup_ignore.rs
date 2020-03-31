@@ -92,7 +92,7 @@ pub trait BackupIgnore {
     ///  assert_eq!(len_start_firefox - len_end_firefox, 33);
     ///  assert_eq!(len_start_code - len_end_code, 1670);
     /// ```
-    fn ignore_files_and_folders_parrarel(backup_dirs: Vec<BackupDir>, extensions_to_ignore: &Vec<String>, folders_to_ignore: &Vec<String>) -> Result<Vec<BackupDir>, String> {
+    fn ignore_files_and_folders_parrarel(backup_dirs: Vec<BackupDir>, extensions_to_ignore: &Vec<String>, folders_to_ignore: &Vec<String>) -> Vec<BackupDir> {
         let mut backup_dirs = Arc::new(Mutex::new(backup_dirs));
         backup_dirs = ignore_extensions_parallel(backup_dirs, extensions_to_ignore);
         backup_dirs = ignore_folders_parallel(backup_dirs, folders_to_ignore);
@@ -102,7 +102,7 @@ pub trait BackupIgnore {
                 if dirs.is_empty() {
                     println!("Error while trying to create input maps - all maps are empty");
                 }
-                Ok(dirs)
+                dirs
             }
             Err(e) => {
                 let message = format!("Fatal error while trying to create input maps - {}", e);
