@@ -114,7 +114,7 @@ pub fn check_input_folders(folders: &Vec<String>) -> Vec<BackupDir> {
                 dirs.push(BackupDir { root_input: folder.clone(), root_output: String::new(), folders: 0, files: 0, backup_entries: Vec::new() })
             }
             false => {
-                println!("Folder {} doesn't exist or is empty, skipping...", folder);
+                println!("Input folder {} doesn't exist or is empty, skipping...", folder);
                 continue;
             }
         }

@@ -14,13 +14,43 @@ use crate::backups::map::backup_mode::BackupMode;
 use std::path::Path;
 use crate::backups::helpers::dirs::get_last_subdir;
 
+#[cfg(test)]
+mod tests {
+    use crate::backups::helpers::dirs::get_last_subdir;
+    use crate::backups::map::backup_map::BackupMap;
+    use crate::backups::map::backup_mode::BackupMode;
+    use crate::backups::modes::backup_multiple::BackupMultiple;
+    use crate::backups::traits::backup::Backup;
+
+    #[test]
+    fn test_backup() {
+        let paths = vec![String::from("/usr/lib/firefox"), String::from("/usr/lib/python3")];
+        let ignore_files = vec![String::from(".so"), String::from(".json")];
+        let ignore_folders = vec![String::from("/browser"), String::from("/extensions")];
+        let mut map = BackupMap::new(BackupMode::Multiple);
+        map.input_folders = paths;
+        map.ignore_extensions = ignore_files;
+        map.ignore_folders = ignore_folders;
+        map.max_backups = 3;
+        map.output_folder = String::from("/home/szymon/Downloads/HOPS");
+        let mut backup_multiple = BackupMultiple::new(map);
+        backup_multiple.backup().unwrap();
+    }
+}
+
 pub struct BackupMultiple {
     pub map: BackupMap,
     previous_maps: Vec<BackupMap>,
 }
 
 impl BackupMultiple {
+    /// Creates new BackupMultiple struct, requires already created BackupMap with filled basic informations like input folders and output folder.
+    ///
+    /// May panic if data have not been filled, or if map's mode isn't multiple.
     pub fn new(map: BackupMap) -> BackupMultiple {
+        if map.output_folder.is_empty() || map.input_folders.is_empty() {
+            panic!("Not all needed data filled");
+        }
         match map.backup_mode {
             BackupMode::Multiple => {}
             _ => panic!("Mode of created map isn't multiple mode, but multiple mode is trying to be executed")
@@ -61,7 +91,7 @@ impl BackupMultiple {
                 }
             }
             false => {
-                println!("Folder {} doesn't exist, creating...", &self.map.output_folder);
+                println!("Output folder {} doesn't exist, creating...", &self.map.output_folder);
                 if let Err(e) = create_dir_all(&self.map.output_folder) {
                     let message = format!("Can't create root outpu folder: {}", e);
                     return Err(message);
@@ -146,30 +176,62 @@ impl BackupInput for BackupMultiple {}
 impl BackupSerialize for BackupMultiple {}
 
 impl Backup for BackupMultiple {
+    /// Main function of BackupMultiple - first it creates backup folder, checking already created backups and deleting oldest folder before that (filled output folder is required to change it!), then creates all input maps, then ignores provided files and folders, then creates output maps,
+    /// then copies all files and serializes map. All of this, except of creating folder and filling output maps is done by using traits.
+    ///
+    /// Function may panic if required variables are empty, or if functions in traits panic. Every non-panic error is printed to user.
+    ///
+    /// # Example:
+    /// To pass test you need to provide your own paths.
+    /// ```
+    /// use flash_backup::backups::map::backup_map::BackupMap;
+    /// use flash_backup::backups::map::backup_mode::BackupMode;
+    /// use flash_backup::backups::modes::backup_multiple::BackupMultiple;
+    /// use flash_backup::backups::traits::backup::Backup;
+    /// let paths = vec![String::from("/usr/lib/firefox"), String::from("/usr/lib/python3")];
+    /// let ignore_files = vec![String::from(".so"), String::from(".json")];
+    /// let ignore_folders = vec![String::from("/browser"), String::from("/extensions")];
+    /// let mut map = BackupMap::new(BackupMode::Multiple);
+    /// map.input_folders = paths;
+    /// map.ignore_extensions = ignore_files;
+    /// map.ignore_folders = ignore_folders;
+    /// map.max_backups = 3;
+    /// map.output_folder = String::from("/home/szymon/Downloads/HOPS");
+    /// let mut backup_multiple = BackupMultiple::new(map);
+    /// backup_multiple.backup().unwrap();
+    /// ```
     fn backup(&mut self) -> Result<(), String> {
+        if self.map.output_folder.is_empty() || self.map.input_folders.is_empty() || self.map.max_backups == 0 {
+            panic!("Trying to backup in multiple mode, but basic metadata is not filled");
+        }
+
         if let Err(e) = self.create_new_backup_folder() {
             let message = format!("Couldn't create new backup folder: {}. Program will stop", e);
             panic!(message);
         }
+        // Not very elegant, find better way without moving so much data
         self.map.backup_dirs = BackupMultiple::create_input_maps(&self.map.input_folders);
         let mut copied = self.map.clone();
         copied.backup_dirs = BackupMultiple::ignore_files_and_folders_parrarel(copied.backup_dirs, &copied.ignore_extensions, &copied.ignore_folders);
-        let mut copied = copied.clone();
+        let copied = copied.clone();
         let mut copied = BackupMultiple::create_output_map(copied);
         copied.backup_dirs = BackupMultiple::copy_all(copied.backup_dirs);
-        BackupMultiple::serialize_to_json(&mut copied);
-
+        if let Err(e) = BackupMultiple::serialize_to_json(&mut copied) {
+            println!("Map couldn't be saved to file, this backup won't be considered next time: {}", e);
+        }
         // self.map = copied.clone();
         Ok(())
     }
 }
 
 impl BackupOutput for BackupMultiple {
+    /// Creates output map - for each entry, output folder is changed to one based on root output folder, created in backup() method that handles "multiple backup" functions.
+    ///
+    /// May panic if root output folder is empty, prints to user any other possible, application non-breaking error.
     fn create_output_map(mut map: BackupMap) -> BackupMap {
         // Checking if create_backup_folder has been executed
         if map.output_folder.is_empty() {
-            println!("Root output folder isn't set up");
-            return map;
+            panic!("Root output folder isn't set up");
         }
         // Creating output paths
         for dir in &mut map.backup_dirs {

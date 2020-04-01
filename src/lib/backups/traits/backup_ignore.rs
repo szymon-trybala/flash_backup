@@ -45,7 +45,7 @@ mod tests {
         let len_start_firefox = map[0].backup_entries.len();
         let len_start_code = map[1].backup_entries.len();
 
-        let map = BackupCloud::ignore_files_and_folders_parrarel(map, &ignore_files, &ignore_folders).unwrap();
+        let map = BackupCloud::ignore_files_and_folders_parrarel(map, &ignore_files, &ignore_folders);
         let len_end_firefox = map[0].backup_entries.len();
         let len_end_code = map[1].backup_entries.len();
 

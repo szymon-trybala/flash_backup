@@ -14,20 +14,89 @@ mod tests {
     use crate::backups::map::backup_dir::BackupDir;
     use crate::backups::map::backup_entry::BackupEntry;
     use crate::backups::modes::backup_cloud::BackupCloud;
-    use crate::backups::traits::backup_copy::BackupCopy;
+    use crate::backups::traits::backup_copy::{BackupCopy, copy_folder, copy_file, create_folder, create_parent_folder};
+    use std::path::Path;
 
     #[test]
     fn test_copy_all() {
         let mut backup_dirs = vec![BackupDir::new(), BackupDir::new()];
-        let entry1 = BackupEntry {input_path: String::from("/usr/lib/chromium/bookmarks.html"), output_path: String::from("home/szymon/Downloads/bookmarks.html"), is_file: true, hash: String::new()};
-        let entry2 = BackupEntry {input_path: String::from("/usr/bin/bash"), output_path: String::from("home/szymon/Downloads/bash"), is_file: true, hash: String::new()};
+        backup_dirs[0].root_output = String::from("/home/szymon/Downloads/backup/1");
+        backup_dirs[1].root_output = String::from("/home/szymon/Downloads/backup/2");
+        let entry1 = BackupEntry {input_path: String::from("/usr/lib/chromium/bookmarks.html"), output_path: String::from("/home/szymon/Downloads/backup/1/bookmarks.html"), is_file: true, hash: String::new()};
+        let entry2 = BackupEntry {input_path: String::from("/usr/bin/bash"), output_path: String::from("/home/szymon/Downloads/backup/2/bash"), is_file: true, hash: String::new()};
         backup_dirs[0].backup_entries.push(entry1);
         backup_dirs[1].backup_entries.push(entry2);
         backup_dirs = BackupCloud::copy_all(backup_dirs);
+        assert!(Path::new(&backup_dirs[0].backup_entries[0].output_path).exists());
+        assert!(Path::new(&backup_dirs[1].backup_entries[0].output_path).exists());
+    }
+
+    #[test]
+    fn test_copy_folder() {
+        let mut dir = BackupDir::new();
+        dir.root_output = String::from("/home/szymon/Downloads/backup/1");
+        let entry1 = BackupEntry {input_path: String::from("/usr/lib/chromium/bookmarks.html"), output_path: String::from("/home/szymon/Downloads/backup/1/bookmarks.html"), is_file: true, hash: String::new()};
+        dir.backup_entries.push(entry1);
+        copy_folder(&mut dir).unwrap();
+        assert!(Path::new(&dir.backup_entries[0].output_path).exists());
+    }
+
+    #[test]
+    fn test_copy_file() {
+        let entry = BackupEntry {input_path: String::from("/usr/lib/chromium/bookmarks.html"), output_path: String::from("/home/szymon/Downloads/backup/1/bookmarks.html"), is_file: true, hash: String::new()};
+        copy_file(&entry).unwrap();
+        assert!(Path::new(&entry.output_path).exists());
+    }
+
+    #[test]
+    fn test_create_folder() {
+        let path = String::from("/home/szymon/Downloads/backup/new_path");
+        create_folder(&path).unwrap();
+        assert!(Path::new(&path).exists());
+    }
+
+    #[test]
+    fn test_create_parent_folder() {
+        let path = String::from("/home/szymon/Downloads/completely_new/path.txt");
+        create_parent_folder(&path).unwrap();
+        assert!(Path::new("/home/szymon/Downloads/completely_new").exists());
     }
 }
 
+/// Provides function to copy all entries from input location to output location.
+///
+/// Requires completely filled BackupMap, after all processing.
 pub trait BackupCopy {
+    /// Copies all files from its input locations to output locations.
+    ///
+    /// Requires completely filled BackupMap, after all processing.
+    ///
+    /// Works concurrently, using max 2 threads at once - too many copying operations working at once can slow down process.
+    ///
+    /// Function may panic if fatal error occurs during multithreading operations and conversions - it's too dangerous to continue runtime at this point.
+    ///
+    /// If any file or folder can't be copied, user gets message, and this file is deleted from map, because serialized map needs to contain only copied files.
+    ///
+    /// # Example:
+    /// This test requires usage of struct that implements BackupInput trait, like BackupCloud or BackupMultiple.
+    /// To pass test you need to provide your own paths.
+    /// ```
+    /// use flash_backup::backups::map::backup_dir::BackupDir;
+    /// use flash_backup::backups::map::backup_entry::BackupEntry;
+    /// use flash_backup::backups::modes::backup_cloud::BackupCloud;
+    /// use std::path::Path;
+    /// use flash_backup::backups::traits::backup_copy::BackupCopy;
+    /// let mut backup_dirs = vec![BackupDir::new(), BackupDir::new()];
+    /// backup_dirs[0].root_output = String::from("/home/szymon/Downloads/backup/1");
+    /// backup_dirs[1].root_output = String::from("/home/szymon/Downloads/backup/2");
+    /// let entry1 = BackupEntry {input_path: String::from("/usr/lib/chromium/bookmarks.html"), output_path: String::from("/home/szymon/Downloads/backup/1/bookmarks.html"), is_file: true, hash: String::new()};
+    /// let entry2 = BackupEntry {input_path: String::from("/usr/bin/bash"), output_path: String::from("/home/szymon/Downloads/backup/2/bash"), is_file: true, hash: String::new()};
+    /// backup_dirs[0].backup_entries.push(entry1);
+    /// backup_dirs[1].backup_entries.push(entry2);
+    /// backup_dirs = BackupCloud::copy_all(backup_dirs);
+    /// assert!(Path::new(&backup_dirs[0].backup_entries[0].output_path).exists());
+    /// assert!(Path::new(&backup_dirs[1].backup_entries[0].output_path).exists());
+    /// ```
     fn copy_all(dirs: Vec<BackupDir>) -> Vec<BackupDir> {
         // Checking input
         if dirs.is_empty() {
@@ -38,8 +107,7 @@ pub trait BackupCopy {
         // Creating necessary variables
         let len = dirs.len();
         let dirs = Arc::new(Mutex::new(dirs));
-        let max_threads = num_cpus::get();
-        let mut thread_pool = Pool::new(max_threads as u32);
+        let mut thread_pool = Pool::new(2);
 
         // Copying - one thread per one BackupDir
         thread_pool.scoped(|scoped| {
@@ -65,6 +133,28 @@ pub trait BackupCopy {
     }
 }
 
+/// Copies content of one BackupDir - for each entry, from input path to output path.
+///
+/// Requires completely filled BackupDir, after all processing.
+///
+/// Function returns error only if no one entry could be copied. Every other error is printed to user and doesn't stop function execution.
+///
+/// BackupDir is modified - every **NOT COPIED** element is removed from it.
+///
+/// # Example:
+/// To pass test you need to provide your own paths.
+/// ```
+/// use flash_backup::backups::map::backup_dir::BackupDir;
+/// use flash_backup::backups::map::backup_entry::BackupEntry;
+/// use std::path::Path;
+/// use flash_backup::backups::traits::backup_copy::copy_folder;
+/// let mut dir = BackupDir::new();
+/// dir.root_output = String::from("/home/szymon/Downloads/backup/1");
+/// let entry1 = BackupEntry {input_path: String::from("/usr/lib/chromium/bookmarks.html"), output_path: String::from("/home/szymon/Downloads/backup/1/bookmarks.html"), is_file: true, hash: String::new()};
+/// dir.backup_entries.push(entry1);
+/// copy_folder(&mut dir).unwrap();
+/// assert!(Path::new(&dir.backup_entries[0].output_path).exists());
+/// ```
 pub fn copy_folder(folder: &mut BackupDir) -> Result<(), String> {
     // Creating root folder
     if let Err(e) = create_folder(&folder.root_output) {
@@ -74,8 +164,14 @@ pub fn copy_folder(folder: &mut BackupDir) -> Result<(), String> {
 
     println!("Copying folder {}...", &folder.root_input);
     let mut copied_entries = vec![];
+    let mut not_filled_entries: usize = 0;
 
     for entry in &folder.backup_entries {
+        if entry.output_path.is_empty() || entry.input_path.is_empty() {
+            not_filled_entries += 1;
+            continue;
+        }
+
         match entry.is_file {
             true => {
                 match copy_file(&entry) {
@@ -97,6 +193,9 @@ pub fn copy_folder(folder: &mut BackupDir) -> Result<(), String> {
             }
         }
     }
+    if not_filled_entries > 0 {
+        println!("{} entries needs more data to copy", not_filled_entries);
+    }
 
     match copied_entries.is_empty() {
         true => {
@@ -117,6 +216,22 @@ pub fn copy_folder(folder: &mut BackupDir) -> Result<(), String> {
     }
 }
 
+/// Copies file from input path to output path (in BackupEntry).
+///
+/// Requires completely filled BackupEntry, after all processing.
+///
+/// Returns error if BackupEntry is not filled, if parent directory can't be created (if needed), if input file can't be opened, if destination file can't be created, or if copying can't be done.
+///
+/// # Example:
+/// To pass test you need to provide your own paths.
+/// ```
+/// use flash_backup::backups::map::backup_entry::BackupEntry;
+/// use flash_backup::backups::traits::backup_copy::copy_file;
+/// use std::path::Path;
+/// let entry = BackupEntry {input_path: String::from("/usr/lib/chromium/bookmarks.html"), output_path: String::from("/home/szymon/Downloads/backup/1/bookmarks.html"), is_file: true, hash: String::new()};
+/// copy_file(&entry).unwrap();
+/// assert!(Path::new(&entry.output_path).exists());
+/// ```
 pub fn copy_file(entry: &BackupEntry) -> Result<(), String> {
     // Checking input
     if entry.input_path.is_empty() || entry.output_path.is_empty() {
@@ -156,6 +271,19 @@ pub fn copy_file(entry: &BackupEntry) -> Result<(), String> {
     Ok(())
 }
 
+/// Creates folder with all its parent folders (if they doesn't exist).
+///
+/// May return error if path is empty or folder can't be created.
+///
+/// # Example:
+/// To pass test you need to provide your own paths.
+/// ```
+/// use flash_backup::backups::traits::backup_copy::create_folder;
+/// use std::path::Path;
+/// let path = String::from("/home/szymon/Downloads/backup/new_path");
+/// create_folder(&path).unwrap();
+/// assert!(Path::new(&path).exists());
+/// ```
 pub fn create_folder(folder: &String) -> Result<(), String> {
     // Checking input
     if folder.is_empty() {
@@ -171,6 +299,18 @@ pub fn create_folder(folder: &String) -> Result<(), String> {
     Ok(())
 }
 
+/// Creates parent folder for provided path.
+///
+/// Returns error if path is empty, if getting last folder fails, or creating folder fails.
+///
+/// # Example:
+/// ```
+/// use flash_backup::backups::traits::backup_copy::{create_folder, create_parent_folder};
+/// use std::path::Path;
+/// let path = String::from("/home/szymon/Downloads/completely_new/path.txt");
+/// create_parent_folder(&path).unwrap();
+/// assert!(Path::new("/home/szymon/Downloads/completely_new").exists());
+/// ```
 pub fn create_parent_folder(file_path: &String) -> Result<(), String> {
     // Checking input
     if file_path.is_empty() {
