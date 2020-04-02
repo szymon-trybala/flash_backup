@@ -1,3 +1,9 @@
+use crate::backups::map::backup_map::BackupMap;
+use crate::backups::map::backup_mode::BackupMode;
+use crate::backups::modes::backup_multiple::BackupMultiple;
+use crate::backups::traits::backup::Backup;
+use crate::backups::modes::backup_cloud::BackupCloud;
+
 pub mod backups;
 pub mod config;
 
@@ -14,6 +20,18 @@ pub static S_CONFIG: &str = ".config.json";
 /// Default name of file containing file with ignores.
 pub static S_IGNORE: &str = ".ignore";
 
+pub fn make_backup(map: BackupMap) {
+    match map.backup_mode {
+        BackupMode::Multiple => {
+            let mut multiple = BackupMultiple::new(map);
+            multiple.backup();
+        }
+        BackupMode::Cloud => {
+            let mut cloud = BackupCloud::new(map);
+            cloud.backup();
+        }
+    }
+}
 
 // TODO - CREATE NICE README
 // TODO - WITH EVERY PANIC SHOULD BE MESSAGE "PROGRAM WILL STOP"

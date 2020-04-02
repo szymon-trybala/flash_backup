@@ -58,10 +58,13 @@ impl BackupCloud {
         // Creating threads and ignoring files from all of them
         thread_pool.scoped(|scope| {
             // Handling dirs that doesn't exist in current backup
-            for dir_without_match_index in &matching_dirs.1 {
-                println!("{} not found in existing backup, will copy all its content", &self.map.backup_dirs[*dir_without_match_index].root_input);
-                let mut copy_dirs_temp = copy_dirs.lock().unwrap();
-                copy_dirs_temp.push(self.map.backup_dirs[*dir_without_match_index].clone());
+            if matching_dirs.1.len() > 0 {
+                for dir_without_match_index in &matching_dirs.1 {
+                    println!("{} not found in existing backup, will copy all its content", &self.map.backup_dirs[*dir_without_match_index].root_input);
+                    let mut copy_dirs_temp = copy_dirs.lock().unwrap();
+                    copy_dirs_temp.push(self.map.backup_dirs[*dir_without_match_index].clone());
+                }
+
             }
 
             // Handling dirs that exist in current backup, but may be different
@@ -160,12 +163,14 @@ impl BackupCloud {
 fn generate_entries_to_copy_one_folder(folder: &BackupDir, previous_folder: &BackupDir) -> BackupDir {
     let mut counter: usize = 0;
     let mut copy_folder = BackupDir::new();
-    for previous_entry in &previous_folder.backup_entries {
-        if previous_entry.is_file {
-
+    if previous_folder.backup_entries.is_empty() {
+        copy_folder.backup_entries = folder.backup_entries.clone();
+    }
+    for entry in &folder.backup_entries {
+        if entry.is_file {
             // Checking if folder contains the same file
             let mut found_matching_hash = false;
-            for entry in &folder.backup_entries {
+            for previous_entry in &previous_folder.backup_entries {
                 if previous_entry.hash == entry.hash {
                     found_matching_hash = true;
                     break;
@@ -175,12 +180,12 @@ fn generate_entries_to_copy_one_folder(folder: &BackupDir, previous_folder: &Bac
             // Adding new/modified file to copy_folder
             if !found_matching_hash {
                 counter += 1;
-                copy_folder.backup_entries.push(previous_entry.clone());
+                copy_folder.backup_entries.push(entry.clone());
             }
         }
     }
     match counter {
-        0 => println!("All files in {} are up-to-date", &previous_folder.root_output),
+        0 => println!("No new files found in {}", &previous_folder.root_output),
         _ => println!("{} new or modified files found in {}", counter, &previous_folder.root_input),
     }
 
@@ -193,10 +198,6 @@ fn generate_entries_to_copy_one_folder(folder: &BackupDir, previous_folder: &Bac
 }
 
 fn delete_missing_one_folder(folder: &BackupDir, previous_folder: &mut BackupDir) -> Result<(), String> {
-    if folder.backup_entries.is_empty() || previous_folder.backup_entries.is_empty() {
-        let message = format!("Can't delete redundant entries from {}: one or more maps are is empty", &folder.root_output);
-        return Err(message);
-    }
     let mut deleted: usize = 0;
 
     for previous_entry in &previous_folder.backup_entries {
@@ -224,8 +225,9 @@ fn delete_missing_one_folder(folder: &BackupDir, previous_folder: &mut BackupDir
             }
         }
     }
-    if deleted > 0 {
-        println!("Deleted {} redundant files from {}", deleted, &folder.root_input);
+    match deleted {
+        0 => println!("No deleted files in {} found", &folder.root_input),
+        _ => println!("Deleted {} redundant files from {}", deleted, &folder.root_input)
     }
 
     Ok(())
@@ -293,14 +295,14 @@ impl Backup for BackupCloud {
             }
         }
 
-        // Not very elegant, find better way without moving so much data
+        // Filling map with data - find better way without moving so much data
         self.map.backup_dirs = BackupCloud::create_input_maps(&self.map.input_folders);
-        let mut copied = self.map.clone();
-        copied.backup_dirs = BackupCloud::ignore_files_and_folders_parrarel(copied.backup_dirs, &copied.ignore_extensions, &copied.ignore_folders);
-        let copied = self.map.clone();
-        let copied = BackupCloud::create_output_map(copied);
-        self.map = copied.clone();
+        let map_copy = self.map.clone();
+        self.map.backup_dirs = BackupCloud::ignore_files_and_folders_parrarel(map_copy.backup_dirs, &map_copy.ignore_extensions, &map_copy.ignore_folders);
+        let map_copy = self.map.clone();
+        self.map = BackupCloud::create_output_map(map_copy);
 
+        // Filling copy_dirs and deleting redundant files
         if let Err(e) = self.generate_entries_to_copy_all() {
             let message = format!("Couldn't generate new/modified entries to copy: {}", e);
             panic!(message);
@@ -311,18 +313,27 @@ impl Backup for BackupCloud {
             }
         }
 
-        let copied = self.map.clone();
-        let mut copied = BackupCloud::create_output_map(copied);
-        self.copy_dirs = BackupCloud::copy_all(self.copy_dirs.clone());
-        let copied = self.copy_dirs.clone();
-        let copied = BackupCloud::delete_non_existing(copied);
-        self.map.backup_dirs = copied;
-        if let Err(e) = BackupCloud::serialize_to_json(&mut self.map) {
-            println!("Map couldn't be saved to file, this backup won't be considered next time: {}", e);
-        }
-        BackupCloud::verify_all(&self.map);
-        // self.map = copied.clone();
+        // Copying and verifying data
+        match self.copy_dirs.is_empty() {
+            true => {
+                println!("No need to copy any files, program will stop now");
+            }
+            false => {
+                // Deleting non-confirmed entries from map
+                self.copy_dirs = BackupCloud::copy_all(self.copy_dirs.clone());
+                let copied = self.map.backup_dirs.clone();
+                self.map.backup_dirs = BackupCloud::delete_non_existing(copied);
 
+                // Serializing map
+                if let Err(e) = BackupCloud::serialize_to_json(&mut self.map) {
+                    println!("Map couldn't be saved to file, this backup won't be considered next time: {}", e);
+                }
+                // Verifying files
+                if let Err(e) = BackupCloud::verify_all(&self.map) {
+                    println!("Error while verifying integrity of copied files: {}", e);
+                }
+            }
+        }
         Ok(())
     }
 }
