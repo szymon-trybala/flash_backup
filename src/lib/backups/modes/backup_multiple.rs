@@ -5,14 +5,12 @@ use crate::backups::traits::backup_input::BackupInput;
 use crate::backups::traits::backup_serialize::BackupSerialize;
 use crate::backups::traits::backup_output::BackupOutput;
 use crate::backups::map::backup_map::BackupMap;
-use walkdir::WalkDir;
-use crate::{S_MAP, S_SEPARATOR};
-use std::fs::{File, create_dir_all};
-use std::io::BufReader;
+use crate::{S_SEPARATOR};
+use std::fs::{create_dir_all};
 use chrono::Local;
 use crate::backups::map::backup_mode::BackupMode;
 use std::path::Path;
-use crate::backups::helpers::dirs::get_last_subdir;
+use crate::backups::helpers::dirs::{get_last_subdir, find_previous_backups};
 
 #[cfg(test)]
 mod tests {
@@ -69,9 +67,15 @@ impl BackupMultiple {
         match Path::new(&self.map.output_folder).exists() {
             true => {
                 // Finding previous backups
-                if let Err(e) = self.find_previous_backups() {
-                    let message = format!("Error finding previous backups: {}", e);
-                    panic!(message)
+                match find_previous_backups(&self.map.output_folder) {
+                    Ok(previous_backups) => {
+                        self.previous_maps = previous_backups;
+                        println!("Found {} previous backups", self.previous_maps.len());
+                    }
+                    Err(e) => {
+                        let message = format!("Error finding previous backups: {}", e);
+                        panic!(message)
+                    }
                 }
                 match self.previous_maps.is_empty() {
                     true => println!("No previous maps found"),
@@ -111,27 +115,6 @@ impl BackupMultiple {
         Ok(())
     }
 
-    /// helper to create_new_backup_folder
-    fn find_previous_backups(&mut self) -> Result<(), String> {
-        self.previous_maps.clear();
-
-        for entry in WalkDir::new(&self.map.output_folder).into_iter().filter_map(|e| e.ok()) {
-            if entry.path().ends_with(S_MAP) {
-                match File::open(entry.path()) {
-                    Err(e) => println!("Error reading possible map, it will not count: {}", e),
-                    Ok(previous_map) => {
-                        let buf_reader = BufReader::new(previous_map);
-                        match serde_json::from_reader(buf_reader) {
-                            Ok(previous_map) => self.previous_maps.push(previous_map),
-                            Err(e) => println!("Possible map, not valid, it will not count: {}", e)
-                        }
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
     /// Use after "find_previous_backups", helper to create_new_backup_folder
     fn delete_oldest_folder(&mut self) -> Result<(), String> {
         // Checking if value exists
@@ -153,9 +136,12 @@ impl BackupMultiple {
         println!("Max amount of backups reached, deleting oldest one: {}", &oldest_map_output_path);
         match std::fs::remove_dir_all(&oldest_map_output_path) {
             Ok(_) => {
-                if let Err(e) = self.find_previous_backups() {
-                    println!("Error: deleted folder is still on list, program thinks there are {} backups", self.previous_maps.len());
-                    return Err(e);
+                match find_previous_backups(&self.map.output_folder) {
+                    Ok(previous_maps) => self.previous_maps = previous_maps,
+                    Err(e) => {
+                        println!("Error: deleted folder is still on list, program thinks there are {} backups", self.previous_maps.len());
+                        return Err(e);
+                    }
                 }
                 Ok(())
             },
@@ -168,11 +154,8 @@ impl BackupMultiple {
 }
 
 impl BackupCopy for BackupMultiple {}
-
 impl BackupIgnore for BackupMultiple {}
-
 impl BackupInput for BackupMultiple {}
-
 impl BackupSerialize for BackupMultiple {}
 
 impl Backup for BackupMultiple {

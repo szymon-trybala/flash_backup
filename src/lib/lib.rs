@@ -15,7 +15,6 @@ pub static S_CONFIG: &str = ".config.json";
 pub static S_IGNORE: &str = ".ignore";
 
 
-// TODO - REMOVE ALL PUB AFTER CREATING DOCUMENTATION
 // TODO - CREATE NICE README
 // TODO - WITH EVERY PANIC SHOULD BE MESSAGE "PROGRAM WILL STOP"
-
+// TODO - check all tests, some may fail now

@@ -5,9 +5,11 @@ use std::fs::{File, remove_file};
 use std::io::{Write};
 use crate::backups::map::backup_dir::BackupDir;
 use crate::backups::helpers::hashing::generate_hash_meow_hash;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use scoped_threadpool::Pool;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::borrow::BorrowMut;
+use crate::backups::helpers::multithreading::arc_to_inner;
 
 #[cfg(test)]
 mod tests {
@@ -57,6 +59,36 @@ mod tests {
 ///
 /// Should be used with completely filled BackupMap, after all processing.
 pub trait BackupSerialize {
+    fn delete_non_existing(dirs: Vec<BackupDir>) -> Vec<BackupDir> {
+        let len = dirs.len();
+        let dirs = Arc::new(Mutex::new(dirs));
+        let max_threads = num_cpus::get();
+        let mut thread_pool = Pool::new(max_threads as u32);
+
+        thread_pool.scoped(|scope| {
+            for i in 0..len {
+                let dirs_ref = Arc::clone(&dirs);
+
+                scope.execute(move || {
+                    let mut dirs_temp = dirs_ref.lock().unwrap();
+                    delete_non_existing_one_folder(dirs_temp[i].borrow_mut());
+                });
+            }
+        });
+
+        match arc_to_inner(dirs) {
+            Ok(dirs) => {
+                if dirs.is_empty() {
+                    println!("Error while trying to track non-existing files - all maps are empty");
+                }
+                dirs
+            }
+            Err(e) => {
+                let message = format!("Fatal error while trying to create input maps - {}", e);
+                panic!(message);
+            }
+        }
+    }
     /// Serializes map to JSON file.
     ///
     /// Should be used with completely filled BackupMap, after all processing, requires filled path to main output folder.
@@ -83,6 +115,7 @@ pub trait BackupSerialize {
         if !json_folder.exists() || json_folder.is_file() {
             return Err(String::from("Invalid output path"));
         }
+
         // Generating metadata, serializing
         println!("Saving folder map to JSON file...");
         map.generate_metadata();
@@ -241,4 +274,14 @@ pub fn verify_one_folder(folder: &BackupDir) -> Result<usize, String> {
             Err(message)
         }
     }
+}
+
+pub fn delete_non_existing_one_folder(folder: &mut BackupDir) {
+    let mut verified = vec![];
+    for entry in &folder.backup_entries {
+        if Path::new(&entry.output_path).exists() {
+            verified.push(entry.clone());
+        }
+    }
+    folder.backup_entries = verified;
 }
