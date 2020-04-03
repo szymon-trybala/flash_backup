@@ -2,15 +2,17 @@ use crate::backups::map::backup_map::BackupMap;
 use std::path::Path;
 use std::{fs, io};
 use crate::backups::map::backup_mode::BackupMode;
-use std::io::BufRead;
-use crate::S_IGNORE;
+use std::io::{BufRead, Write};
+use crate::{S_IGNORE, S_CONFIG, S_SEPARATOR};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
+#[derive(Serialize, Deserialize)]
 pub struct Config {
     pub input_paths: Vec<String>,
     pub output_path: String,
     pub max_backups: usize,
-    pub mode: Mode,
+    pub mode: BackupMode,
 }
 
 impl Config {
@@ -18,13 +20,13 @@ impl Config {
         Config { input_paths: vec![], output_path: String::new(), max_backups: 0, mode: BackupMode::Multiple }
     }
 
-    pub fn create_backup_map(&mut self, run_new_config: usize, custom_config_path: &str, custom_ignore_path: &str, mode: &str) -> BackupMap {
+    pub fn create_backup_map(&mut self, run_new_config: usize, custom_config_path: &str, custom_ignore_path: &str) -> BackupMap {
         let mut config = Config::new();
-
+        println!("RUN NEW CONFIG: {}", run_new_config);
         if run_new_config == 0 {
             match config.load_existing_config(custom_config_path) {
                 Ok(custom_config) => config = custom_config,
-                Err(e) => {
+                Err(_) => {
                     println!("Error loading config, asking again...");
                     config = self.create_and_save_config();
                 }
@@ -40,7 +42,6 @@ impl Config {
         } else {
             ignore_path = custom_ignore_path;
         }
-        let ignores;
         match self.load_ignores(ignore_path) {
             Err(e) => println!("{}", e),
             Ok((folders, extensions)) => {
@@ -48,7 +49,7 @@ impl Config {
                 map.ignore_extensions = extensions;
             }
         }
-        BackupMap
+        map
     }
 
     pub fn load_existing_config(&mut self, custom_config_path: &str) -> Result<Config, String> {
@@ -56,7 +57,7 @@ impl Config {
         if custom_config_path.len() > 0 {
             config_path = custom_config_path;
         } else {
-            config_path = CONFIG_FILE;
+            config_path = S_CONFIG;
         }
 
         match Path::new(config_path).exists() {
@@ -91,7 +92,7 @@ impl Config {
         config.input_paths = self.get_input_paths_from_user();
         config.output_path = self.get_output_path_from_user();
         config.mode = self.get_mode_from_user();
-        match self.mode {
+        match config.mode {
             BackupMode::Cloud => {
                 config.max_backups = 1;
             }
@@ -99,9 +100,8 @@ impl Config {
                 config.max_backups = self.get_max_backups_amount_from_user();
             }
         }
-
-        if let Err(_) = self.save_config_to_json() {
-            panic!("Couldn't write config to file, config won't be saved, program will stop");
+        if let Err(_) = self.save_config_to_json(&config) {
+            println!("Couldn't write config to file, config won't be saved");
         }
         config
     }
@@ -111,6 +111,23 @@ impl Config {
         match Path::new(&trimmed).exists() {
             true => Ok(String::from(trimmed)),
             false => Err(String::from("This input path doesn't exist"))
+        }
+    }
+
+    pub fn save_config_to_json(&self, config: &Config) -> Result<(), &'static str> {
+        match serde_json::to_string_pretty(config) {
+            Err(_) => Err("Serialization to string failed"),
+            Ok(json_string) => {
+                match fs::File::create(S_CONFIG) {
+                    Err(_) => Err("Error: couldn't create JSON file with folder map!"),
+                    Ok(mut file) => {
+                        match file.write_all(json_string.as_ref()) {
+                            Err(_) => Err("Error: couldn't write JSON text to file"),
+                            Ok(_) => Ok(())
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -124,7 +141,7 @@ impl Config {
                 Ok(_) => {
                     if path.trim().len() == 0 {
                         println!("Input path is empty!");
-                        self.ask_for_input();
+                        self.get_input_paths_from_user();
                     }
 
                     match self.check_input_path_from_user(&path[..]) {
@@ -175,12 +192,11 @@ impl Config {
                     return String::from(path.trim());
                 }
             },
-            Err(e) => {
+            Err(_) => {
                 println!("Can't read your output ");
                 return self.get_output_path_from_user();
             }
         }
-        String::new()
     }
 
     pub fn get_max_backups_amount_from_user(&mut self) -> usize {
@@ -235,7 +251,7 @@ impl Config {
         if custom_ignore.len() > 0 {
             ignore_path = custom_ignore;
         } else {
-            ignore_path = IGNORE_FILE;
+            ignore_path = S_IGNORE;
         }
 
         return match fs::File::open(ignore_path) {
@@ -257,7 +273,7 @@ impl Config {
                             // Lines for file extensions has to start with dot and not end with / or \
                             if line.starts_with(".") {
                                 ignores_extensions.push(line);
-                            } else if line.starts_with(FOLDER_SEPARATOR) {
+                            } else if line.starts_with(S_SEPARATOR) {
                                 ignores_folders.push(line);
                             }
                         }

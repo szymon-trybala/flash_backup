@@ -1,7 +1,9 @@
 use std::path::Path;
 use clap::{App, Arg};
+use crate::config::config::Config;
+use crate::backups::map::backup_map::BackupMap;
 
-pub fn get_args_from_cli() {
+pub fn args_to_map() -> BackupMap {
     let matches = App::new("Flash Backup")
         .version("0.9")
         .author("Szymon Trybała <szymon.trybala@protonmail.com")
@@ -21,25 +23,27 @@ pub fn get_args_from_cli() {
             .long(".ignore")
             .value_name("IGNORE")
             .help("Loads your custom .ignore file. If not provided program will copy every folder and file from source directories"))
-        .arg(Arg::with_name("mode")
-            .short("m")
-            .long("mode")
-            .value_name("MODE")
-            .help("Sets copy mode - you can choose between multiple (m, multiple) and cloud (c, cloud) modes. If not provided, mode will be loaded from .config.json file"))
         .get_matches();
 
     let custom_config_path = matches.value_of("config").unwrap_or("");
     let custom_ignore_path = matches.value_of(".ignore").unwrap_or("");
-    let custom_mode = matches.value_of("mode").unwrap_or("");
-    let run_new_config = matches.value_of("new").unwrap_or(0);
-
-    check_args(run_new_config, custom_config_path, custom_ignore_path, custom_mode);
-    create_backup_map(run_new_config, custom_config_path, custom_ignore_path, custom_mode);
+    let run_new_config = matches.value_of("new").unwrap_or("0");
+    let map = check_and_send_args(run_new_config, custom_config_path, custom_ignore_path);
+    return map;
 }
 
-pub fn check_args(run_new_config: usize, config_path: &str, ignore_path: &str, mode: &str) {
-    if run_new_config != 0 || run_new_config != 1 {
-        panic!("Unrecognized argument for deciding if you want to create new config");
+pub fn check_and_send_args(run_new_config: &str, config_path: &str, ignore_path: &str) -> BackupMap {
+    let mut run_new_config = run_new_config.trim();
+    match run_new_config {
+        "0" => {},
+        "1" => {},
+        _ => run_new_config = "0",
+    }
+
+    let mut run_new_config_usize: usize = 0;
+    match run_new_config.parse::<usize>() {
+        Ok(arg) => run_new_config_usize = arg,
+        Err(_) => panic!("Argument 'new' isn't valid number, provide 0 or 1!"),
     }
 
     if config_path.len() > 0 {
@@ -56,9 +60,7 @@ pub fn check_args(run_new_config: usize, config_path: &str, ignore_path: &str, m
         }
     }
 
-    if mode.len() > 0 {
-        if !(mode == "m" || mode == "multiple" || mode == "c" || mode == "cloud") {
-            panic!("Unrecognized argument for mode selection");
-        }
-    }
+    let mut config = Config::new();
+    let map = config.create_backup_map(run_new_config_usize, config_path, ignore_path);
+    return map;
 }

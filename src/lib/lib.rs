@@ -24,12 +24,15 @@ pub fn make_backup(map: BackupMap) {
     match map.backup_mode {
         BackupMode::Multiple => {
             let mut multiple = BackupMultiple::new(map);
-            multiple.backup();
+            if let Err(e) = multiple.backup() {
+                panic!("Couldn't backup: {}", e);
+            }
         }
         BackupMode::Cloud => {
             let mut cloud = BackupCloud::new(map);
-            cloud.backup();
-        }
+            if let Err(e) = cloud.backup() {
+                panic!("Couldn't backup: {}", e);
+            }        }
     }
 }
 
