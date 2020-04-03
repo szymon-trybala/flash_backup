@@ -3,6 +3,12 @@ use clap::{App, Arg};
 use crate::config::config::Config;
 use crate::backups::map::backup_map::BackupMap;
 
+/// Gets program arguments, checks them and then returns initially filled ```BackupMap``` based on them.
+///
+/// Possible arguments are: ```-n``` / ```--new``` for confirming that user wants to create new config and overwrite existing one (with possible values 0 or 1),
+/// ```-c``` / ```--config``` with path as value, to load config file from this path, or ```-i``` / ```--ignore```, which does the same thing with ignore file.
+///
+/// Function may panic if arguments are invalid.
 pub fn args_to_map() -> BackupMap {
     let matches = App::new("Flash Backup")
         .version("0.9")
@@ -32,6 +38,9 @@ pub fn args_to_map() -> BackupMap {
     return map;
 }
 
+/// Checks integrity of arguments, if every one of them is ok it gets map from ```Config``` struct and returns it.
+///
+/// Panics if arguments are invalid - ```run_new_config``` has to be 0 or 1 (in other cases it will be changed to 0), and ```config_path``` and ```ignore_path``` must exist and be a file, if those strings are not empty.
 pub fn check_and_send_args(run_new_config: &str, config_path: &str, ignore_path: &str) -> BackupMap {
     let mut run_new_config = run_new_config.trim();
     match run_new_config {
@@ -43,20 +52,20 @@ pub fn check_and_send_args(run_new_config: &str, config_path: &str, ignore_path:
     let mut run_new_config_usize: usize = 0;
     match run_new_config.parse::<usize>() {
         Ok(arg) => run_new_config_usize = arg,
-        Err(_) => panic!("Argument 'new' isn't valid number, provide 0 or 1!"),
+        Err(_) => panic!("Argument 'new' isn't valid number, provide 0 or 1!. Program will stop"),
     }
 
     if config_path.len() > 0 {
         let config_path = Path::new(config_path);
         if !(config_path.exists() && config_path.is_file()) {
-            panic!("Wrong path to config file");
+            panic!("Wrong path to config file. Program will stop");
         }
     }
 
     if ignore_path.len() > 0 {
         let ignore_path = Path::new(ignore_path);
         if !(ignore_path.exists() && ignore_path.is_file()) {
-            panic!("Wrong path to ignore file");
+            panic!("Wrong path to ignore file. Program will stop");
         }
     }
 

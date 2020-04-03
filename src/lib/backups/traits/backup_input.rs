@@ -81,11 +81,11 @@ pub trait BackupInput {
                 if !dirs.is_empty() {
                     dirs
                 } else {
-                    panic!("Fatal error while trying to create input maps - all maps are empty");
+                    panic!("Fatal error while trying to create input maps - all maps are empty. Program will stop");
                 }
             }
             Err(e) => {
-                let message = format!("Fatal error while trying to create input maps - {}", e);
+                let message = format!("Fatal error while trying to create input maps - {}. Program will stop", e);
                 panic!(message);
             }
         }
@@ -121,7 +121,7 @@ pub fn check_input_folders(folders: &Vec<String>) -> Vec<BackupDir> {
     }
 
     match dirs.is_empty() {
-        true => panic!("Fatal error: no existing and non-empty folder provided"),
+        true => panic!("Fatal error: no existing and non-empty folder provided. Program will stop"),
         false => dirs
     }
 }

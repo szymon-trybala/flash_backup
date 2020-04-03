@@ -25,17 +25,15 @@ pub fn make_backup(map: BackupMap) {
         BackupMode::Multiple => {
             let mut multiple = BackupMultiple::new(map);
             if let Err(e) = multiple.backup() {
-                panic!("Couldn't backup: {}", e);
+                panic!("Couldn't backup: {}. Program will stop", e);
             }
         }
         BackupMode::Cloud => {
             let mut cloud = BackupCloud::new(map);
             if let Err(e) = cloud.backup() {
-                panic!("Couldn't backup: {}", e);
+                panic!("Couldn't backup: {}. Program will stop", e);
             }        }
     }
 }
 
 // TODO - CREATE NICE README
-// TODO - WITH EVERY PANIC SHOULD BE MESSAGE "PROGRAM WILL STOP"
-// TODO - check all tests, some may fail now

@@ -20,6 +20,11 @@ impl Config {
         Config { input_paths: vec![], output_path: String::new(), max_backups: 0, mode: BackupMode::Multiple }
     }
 
+    /// Creates BackupMap struct based on initially processed and checked arguments.
+    ///
+    /// Tries to load existing config file, if no files is found creates new config asking user about data.
+    ///
+    /// Panics if user's data is wrong.
     pub fn create_backup_map(&mut self, run_new_config: usize, custom_config_path: &str, custom_ignore_path: &str) -> BackupMap {
         let mut config = Config::new();
         println!("RUN NEW CONFIG: {}", run_new_config);
@@ -52,6 +57,9 @@ impl Config {
         map
     }
 
+    /// Loads existing config file in the same folder as program executable, converts it to Config struct, then returns it.
+    ///
+    /// May return error if file can't be opened or file can't be converted to struct.
     pub fn load_existing_config(&mut self, custom_config_path: &str) -> Result<Config, String> {
         let config_path;
         if custom_config_path.len() > 0 {
@@ -86,6 +94,9 @@ impl Config {
         }
     }
 
+    /// Creates new config struct from user input, then saves it to .JSON file.
+    ///
+    /// Panics if data provided by user isn't valid.
     pub fn create_and_save_config(&mut self) -> Config {
         println!("Couldn't find config file, create one:");
         let mut config = Config {output_path: String::new(), input_paths: vec![], max_backups: 0, mode: BackupMode::Multiple };
@@ -106,6 +117,11 @@ impl Config {
         config
     }
 
+    /// Checks if path exists, then returns trimmed string.
+    ///
+    /// Should be used only from ```get_input_paths_from_user``` function.
+    ///
+    /// May return error if path doesn't exist.
     pub fn check_input_path_from_user(&mut self, path_raw: &str) -> Result<String, String> {
         let trimmed = path_raw.trim();
         match Path::new(&trimmed).exists() {
@@ -114,6 +130,9 @@ impl Config {
         }
     }
 
+    /// Saves provided ```Config``` struct to JSON file with name the same as ```S_CONFIG``` const.
+    ///
+    /// May return error if serialization fails, file can't be opened or text can't be writed.
     pub fn save_config_to_json(&self, config: &Config) -> Result<(), &'static str> {
         match serde_json::to_string_pretty(config) {
             Err(_) => Err("Serialization to string failed"),
@@ -131,6 +150,9 @@ impl Config {
         }
     }
 
+    /// Asks user about input folders, checks if it's valid, then asks user if he wants to add another. If user agrees, process repeats.
+    ///
+    /// If user points to non-valid path or error occurs, user is asked to input path again.
     pub fn get_input_paths_from_user(&mut self) -> Vec<String> {
         let mut input_paths = vec![];
 
@@ -179,6 +201,10 @@ impl Config {
         input_paths
     }
 
+
+    /// Asks user about output folder, checks if it's valid, if yes folder's path is returned.
+    ///
+    /// If user points to non-valid path or error occurs, user is asked to input path again.
     pub fn get_output_path_from_user(&mut self) -> String {
         let mut path = String::new();
         println!("Write path to destination folder:");
@@ -199,6 +225,9 @@ impl Config {
         }
     }
 
+    /// Asks user about maximum amount of backups (only for Multiple mode), checks if it's valid, if yes, amount is returned.
+    ///
+    /// If user writes invalid string, he's asked to do it again.
     pub fn get_max_backups_amount_from_user(&mut self) -> usize {
         let mut amount = String::new();
         println!("How many backups do you want to keep?:");
@@ -228,6 +257,9 @@ impl Config {
         1
     }
 
+    /// Asks user about mode of backup (m/multiple or c/cloud), checks if it's valid, if yes, amount is returned.
+    ///
+    /// If user writes invalid string, he's asked to do it again.
     pub fn get_mode_from_user(&mut self) -> BackupMode {
         let mut mode = String::new();
         println!("Do you want to use multiple or cloud mode (m/c)?:");
@@ -246,6 +278,11 @@ impl Config {
         }
     }
 
+    /// Loads ignores from default path (the same as program's executable) or provided path if it's non-empty, then returns it as tuple of two vectors.
+    ///
+    /// Ignore syntax is ".extension" for extensions (for example ".exe") and "/folder" for folders, with slash on all operating systems. Example: "/node_modules".
+    ///
+    /// May return error if file can't be found, other errors are printed to user
     pub fn load_ignores(&self, custom_ignore: &str) -> Result<(Vec<String>, Vec<String>), &'static str>  {
         let ignore_path;
         if custom_ignore.len() > 0 {

@@ -14,7 +14,6 @@ use crate::backups::helpers::dirs::{get_last_subdir, find_previous_backups};
 
 #[cfg(test)]
 mod tests {
-    use crate::backups::helpers::dirs::get_last_subdir;
     use crate::backups::map::backup_map::BackupMap;
     use crate::backups::map::backup_mode::BackupMode;
     use crate::backups::modes::backup_multiple::BackupMultiple;
@@ -47,11 +46,11 @@ impl BackupMultiple {
     /// May panic if data have not been filled, or if map's mode isn't multiple.
     pub fn new(map: BackupMap) -> BackupMultiple {
         if map.output_folder.is_empty() || map.input_folders.is_empty() {
-            panic!("Not all needed data filled");
+            panic!("Not all needed data filled. Program will stop");
         }
         match map.backup_mode {
             BackupMode::Multiple => {}
-            _ => panic!("Mode of created map isn't multiple mode, but multiple mode is trying to be executed")
+            _ => panic!("Mode of created map isn't multiple mode, but multiple mode is trying to be executed. Program will stop")
         }
         let backup_multiple = BackupMultiple { map, previous_maps: vec![] };
         backup_multiple
@@ -61,7 +60,7 @@ impl BackupMultiple {
     fn create_new_backup_folder(&mut self) -> Result<(), String> {
         // Checking values
         if self.map.output_folder.is_empty() {
-            panic!("Output folder is not set");
+            panic!("Output folder is not set. Program will stop");
         }
 
         match Path::new(&self.map.output_folder).exists() {
@@ -73,7 +72,7 @@ impl BackupMultiple {
                         println!("Found {} previous backups", self.previous_maps.len());
                     }
                     Err(e) => {
-                        let message = format!("Error finding previous backups: {}", e);
+                        let message = format!("Error finding previous backups: {}. Program will stop", e);
                         panic!(message)
                     }
                 }
@@ -97,7 +96,7 @@ impl BackupMultiple {
             false => {
                 println!("Output folder {} doesn't exist, creating...", &self.map.output_folder);
                 if let Err(e) = create_dir_all(&self.map.output_folder) {
-                    let message = format!("Can't create root outpu folder: {}", e);
+                    let message = format!("Can't create root output folder: {}", e);
                     return Err(message);
                 }
             }
@@ -107,7 +106,7 @@ impl BackupMultiple {
         let date_string = date_now.format("%d-%m-%Y %H_%M_%S").to_string();
         let new_backup_path = format!("{}{}{}", self.map.output_folder, S_SEPARATOR, date_string);
         if let Err(e) = create_dir_all(&new_backup_path) {
-            let message = format!("Folder {} for new backup can't be created: {}", &new_backup_path, e);
+            let message = format!("Folder {} for new backup can't be created: {}. Program will stop", &new_backup_path, e);
             panic!(message);
         }
         self.map.output_folder = new_backup_path;
@@ -159,7 +158,9 @@ impl BackupInput for BackupMultiple {}
 impl BackupSerialize for BackupMultiple {}
 
 impl Backup for BackupMultiple {
-    /// Main function of BackupMultiple - first it creates backup folder, checking already created backups and deleting oldest folder before that (filled output folder is required to change it!), then creates all input maps, then ignores provided files and folders, then creates output maps,
+    /// Main function of BackupMultiple, that runs all corresponding functions.
+    ///
+    /// First it creates backup folder, checking already created backups and deleting oldest folder before that (filled output folder is required to change it!), then creates all input maps, then ignores provided files and folders, then creates output maps,
     /// then copies all files and serializes map. All of this, except of creating folder and filling output maps is done by using traits.
     ///
     /// Function may panic if required variables are empty, or if functions in traits panic. Every non-panic error is printed to user.
@@ -185,7 +186,7 @@ impl Backup for BackupMultiple {
     /// ```
     fn backup(&mut self) -> Result<(), String> {
         if self.map.output_folder.is_empty() || self.map.input_folders.is_empty() || self.map.max_backups == 0 {
-            panic!("Trying to backup in multiple mode, but basic metadata is not filled");
+            panic!("Trying to backup in multiple mode, but basic metadata is not filled. Program will stop");
         }
 
         if let Err(e) = self.create_new_backup_folder() {
@@ -214,7 +215,7 @@ impl BackupOutput for BackupMultiple {
     fn create_output_map(mut map: BackupMap) -> BackupMap {
         // Checking if create_backup_folder has been executed
         if map.output_folder.is_empty() {
-            panic!("Root output folder isn't set up");
+            panic!("Root output folder isn't set up. Program will stop");
         }
         // Creating output paths
         for dir in &mut map.backup_dirs {

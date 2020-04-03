@@ -84,7 +84,7 @@ pub trait BackupSerialize {
                 dirs
             }
             Err(e) => {
-                let message = format!("Fatal error while trying to create input maps - {}", e);
+                let message = format!("Fatal error while trying to create input maps - {}. Program will stop", e);
                 panic!(message);
             }
         }
@@ -276,6 +276,9 @@ pub fn verify_one_folder(folder: &BackupDir) -> Result<usize, String> {
     }
 }
 
+/// Deletes from BackupDir all entries whose output path doesn't exist.
+///
+/// Should be used straight before verification.
 pub fn delete_non_existing_one_folder(folder: &mut BackupDir) {
     let mut verified = vec![];
     for entry in &folder.backup_entries {

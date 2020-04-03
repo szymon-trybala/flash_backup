@@ -126,7 +126,7 @@ pub trait BackupCopy {
         match arc_to_inner(dirs) {
             Ok(dirs) => dirs,
             Err(e) => {
-                let message = format!("Fatal error while trying to create input maps - {}", e);
+                let message = format!("Fatal error while trying to create input maps - {}. Program will stop", e);
                 panic!(message);
             }
         }

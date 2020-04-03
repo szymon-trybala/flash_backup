@@ -10,13 +10,20 @@ use std::error::Error;
 
 #[cfg(test)]
 mod tests {
-    use crate::backups::helpers::dirs::get_last_subdir;
+    use crate::backups::helpers::dirs::{get_last_subdir, find_previous_backups};
 
     #[test]
     fn test_get_last_subdir() {
         let path = String::from("/usr/lib/firefox");
         let last = get_last_subdir(&path).unwrap();
-        assert_eq!(last, String::from("firefox"));    }
+        assert_eq!(last, String::from("firefox"));
+    }
+
+    #[test]
+    fn test_find_previous_backups() {
+        let backups = find_previous_backups(&String::from("/home/szymon/Downloads/test")).unwrap();
+        assert_eq!(backups.len(), 0);
+    }
 }
 
 /// Returns last section from path (for example "/usr/lib/firefox" returns "firefox", and "/usr/lib/a.txt" returns "a.txt".
@@ -48,6 +55,19 @@ pub fn get_last_subdir(path: &String) -> Result<String, String> {
     }
 }
 
+/// Finds all files with name defined by S_MAP const inside folder passed in argument.
+///
+/// Returns vector containing found maps (if 0 found, vector is empty), or error.
+///
+/// Error is returned if path isn't directory, also user gets a message if file can't be opened or converted to Map struct.
+///
+/// # Example:
+/// Provide your own path to empty folder to pass test.
+/// ```
+/// use flash_backup::backups::helpers::dirs::find_previous_backups;
+/// let backups = find_previous_backups(&String::from("/home/user/xxx/maps")).unwrap();
+/// assert_eq!(backups.len(), 0);
+/// ```
 pub fn find_previous_backups(dir: &String) -> Result<Vec<BackupMap>, String> {
     let mut previous_maps = vec![];
     let path = Path::new(dir);
@@ -71,6 +91,13 @@ pub fn find_previous_backups(dir: &String) -> Result<Vec<BackupMap>, String> {
     Ok(previous_maps)
 }
 
+/// Deletes folder and all its content, recursively, until nothing is left in folder.
+///
+/// Requires BackupDir containing paths that also are contained in folder with path provided in argument.
+///
+/// Shouldn't really be used in any other way than helper function in cloud mode.
+///
+/// If error occurs during removing any folder, function execution is stopped and error is returned.
 pub fn delete_folder_with_content(path: &String, map_folder: &BackupDir) -> Result<usize, Box<dyn Error>> {
     let mut entries: usize = 0;
     let path_with_separator = String::from(path) + S_SEPARATOR;

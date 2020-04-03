@@ -24,19 +24,32 @@ pub struct BackupCloud {
 }
 
 impl BackupCloud {
+    /// Creates new BackupCloud struct, requires already created BackupMap with filled basic informations like input folders and output folder.
+    ///
+    /// May panic if data have not been filled, or if map's mode isn't multiple.
     pub fn new(map: BackupMap) -> BackupCloud {
         if map.output_folder.is_empty() || map.input_folders.is_empty() {
-            panic!("Not all needed data filled");
+            panic!("Not all needed data filled. Program will stop");
         }
         match map.backup_mode {
             BackupMode::Cloud => {}
-            _ => panic!("Mode of created map isn't in cloud mode, but cloud mode is trying to be executed")
+            _ => panic!("Mode of created map isn't in cloud mode, but cloud mode is trying to be executed. Program will stop")
         }
         let backup_cloud = BackupCloud { map, previous_map: BackupMap::new(BackupMode::Cloud), copy_dirs: vec![], matching_dirs: (vec![], vec![])};
         backup_cloud
     }
 
-    /// Use after filling input and ignoring
+    /// Searches for new or modified entries in folders and puts them in ```copy_dirs``` fields.
+    ///
+    /// Works in multi threads (max amount of them is equal to computer's thread count).
+    ///
+    /// New or modified file is file with different hash then it's equivalent in backup.
+    ///
+    /// Shoud be used after filling input and ignoring, alongside with deleting missing files.
+    ///
+    /// Returns error if there isn't any previously created backup.
+    /// Function can panic if fatal error occurs during multithreading operations and conversions - it's too dangerous to continue runtime at this point. Function returns error if provided map is empty.
+    /// Minor errors are printed and do not stop execution of program.
     pub fn generate_entries_to_copy_all(&mut self) -> Result<(), String> {
         // Checking input
         if self.map.backup_dirs.is_empty() {
@@ -97,6 +110,7 @@ impl BackupCloud {
         }
     }
 
+    /// Finds the same ```BackupDir```'s in already created backup and newly checked folders - dirs are "the same" if their root inputs are equal.
     fn find_linked_dirs(&self, dirs: &Vec<BackupDir>, previous_dirs: &Vec<BackupDir>) -> (Vec<(usize, usize)>, Vec<usize>) {
         let mut matching = vec![];
         let mut without_match = vec![];
@@ -117,6 +131,15 @@ impl BackupCloud {
         (matching, without_match)
     }
 
+    /// Deletes from backup folders all files and folders that doesn't exist in latest version of input folders.
+    ///
+    /// Shoud be used after filling input and ignoring, alongside with copying new/modified entries.
+    ///
+    /// Works in multi threads (max amount of them fixed at 4, to not overload the hard disk).
+    ///
+    /// Returns error if there isn't any previously created backup, or if there are no matching folders.
+    /// Function can panic if fatal error occurs during multithreading operations and conversions - it's too dangerous to continue runtime at this point. Function returns error if provided map is empty.
+    /// Minor errors are printed and do not stop execution of program.
     pub fn delete_missing_all(&self) -> Result<(), String> {
         println!("Looking for deleted folders and files...");
         // Checking input
@@ -160,6 +183,12 @@ impl BackupCloud {
     }
 }
 
+/// Searches for new or modified entries in one folder.
+///
+/// Compares folders content with its equivalent in backup and returns ```BackupDir``` of those entries that doesn't have equivalent in backup.
+///
+///
+/// New or modified file is file with different hash then it's equivalent in backup.
 fn generate_entries_to_copy_one_folder(folder: &BackupDir, previous_folder: &BackupDir) -> BackupDir {
     let mut counter: usize = 0;
     let mut copy_folder = BackupDir::new();
@@ -197,6 +226,11 @@ fn generate_entries_to_copy_one_folder(folder: &BackupDir, previous_folder: &Bac
     copy_folder
 }
 
+/// Deletes from folder all files and folders that doesn't exist in latest version of input folders, deletes them also from map.
+///
+/// The function acknowledges that the file does not exist in current version of folder if no file in current version of folder has the same hash.
+///
+/// Function returns error if folder can't be deleted recursively.
 fn delete_missing_one_folder(folder: &BackupDir, previous_folder: &mut BackupDir) -> Result<(), String> {
     let mut deleted: usize = 0;
 
@@ -242,10 +276,13 @@ impl BackupInput for BackupCloud {}
 impl BackupSerialize for BackupCloud {}
 
 impl BackupOutput for BackupCloud {
+    /// Creates output map - for each entry, output folder is changed to one based on root output folder.
+    ///
+    /// May panic if root output folder is empty, prints to user any other possible, application non-breaking error.
     fn create_output_map(mut map: BackupMap) -> BackupMap {
         // Checking if create_backup_folder has been executed
         if map.output_folder.is_empty() {
-            panic!("Root output folder isn't set up");
+            panic!("Root output folder isn't set up. Program will stop");
         }
 
         // Creating output paths
@@ -269,9 +306,16 @@ impl BackupOutput for BackupCloud {
 }
 
 impl Backup for BackupCloud {
+    /// Main function of BackupCloud, that runs all corresponding functions.
+    ///
+    /// First it checks if output folder exists. If yes, it tries to find previous backup. If no, folder is created.
+    /// Then map is filled with data and ignoring is applied. Then, program checks new or modified files and saves them to separate field, redundant files and folders are also removed from backup.
+    /// Then if any files to copy are present, it copies all of them and checks integrity of both files and map.
+    ///
+    /// Function may panic if required variables are empty, or if functions in traits panic. Every non-panic error is printed to user.
     fn backup(&mut self) -> Result<(), String> {
         if self.map.output_folder.is_empty() || self.map.input_folders.is_empty() {
-            panic!("Trying to backup in cloud mode, but basic metadata is not filled");
+            panic!("Trying to backup in cloud mode, but basic metadata is not filled. Program will stop");
         }
         match Path::new(&self.map.output_folder).exists() {
             true => {
@@ -290,7 +334,7 @@ impl Backup for BackupCloud {
             },
             false => {
                 if let Err(_) = create_dir_all(&self.map.output_folder) {
-                    panic!("Can't create output folder")
+                    panic!("Can't create output folder. Program will stop")
                 }
             }
         }

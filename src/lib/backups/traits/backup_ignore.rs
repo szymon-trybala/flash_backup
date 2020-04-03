@@ -10,47 +10,43 @@ mod tests {
     use crate::backups::traits::backup_input::BackupInput;
     use crate::backups::traits::backup_ignore::{ignore_extensions_single_folder, ignore_folders_single_folder, BackupIgnore};
     use crate::backups::modes::backup_cloud::BackupCloud;
+    use crate::backups::map::backup_dir::BackupDir;
+    use crate::backups::map::backup_entry::BackupEntry;
+    use crate::backups::map::backup_map::BackupMap;
+    use crate::backups::map::backup_mode::BackupMode;
 
     #[test]
     fn test_ignore_extensions_single_folder() {
-        let ignores = vec![String::from("/browser")];
-        let paths = vec![String::from("/usr/lib/firefox")];
-        let mut cloud = BackupCloud::new(&paths);
-        let len_start = cloud.map.backup_dirs[0].backup_entries.len();
-        ignore_folders_single_folder(&mut cloud.map.backup_dirs[0], &ignores);
-        let len_end = cloud.map.backup_dirs[0].backup_entries.len();
-        assert_eq!(len_start - len_end, 22);
+        let mut dir = BackupDir {files: 1, folders: 1, root_input: String::new(), root_output: String::new(), backup_entries: vec![
+            BackupEntry {input_path: String::from("/home/user/Downloads/X/node_modules"), output_path: String::from("/home/user/Downloads/backup/node_modules"), is_file: false, hash: String::new() },
+        BackupEntry{ input_path: String::from("/home/user/Downloads/X/node_modules/123.js"), output_path: String::from("/home/user/Downloads/backup/node_modules/123.json"), is_file: true, hash: String::from("12345") }]};
+        ignore_folders_single_folder(&mut dir, &vec![String::from("/dupa_modules")]);
+        assert_eq!(dir.backup_entries.len(), 2);
+        ignore_folders_single_folder(&mut dir, &vec![String::from("/node_modules")]);
+        assert_eq!(dir.backup_entries.len(), 0);
     }
 
     #[test]
     fn test_ignore_folders_single_folder() {
-        let ignores = vec![String::from(".so"), String::from(".png")];
-        let paths = vec![String::from("/usr/lib/firefox")];
-        let mut cloud = BackupCloud::new(&paths);
-        let len_start = cloud.map.backup_dirs[0].backup_entries.len();
-        ignore_extensions_single_folder(&mut cloud.map.backup_dirs[0], &ignores);
-        let len_end = cloud.map.backup_dirs[0].backup_entries.len();
-        assert_eq!(len_start - len_end, 15);
+        let mut dir = BackupDir {files: 1, folders: 1, root_input: String::new(), root_output: String::new(), backup_entries: vec![
+            BackupEntry {input_path: String::from("/home/user/Downloads/X/node_modules"), output_path: String::from("/home/user/Downloads/backup/node_modules"), is_file: false, hash: String::new() },
+            BackupEntry{ input_path: String::from("/home/user/Downloads/X/node_modules/123.js"), output_path: String::from("/home/user/Downloads/backup/node_modules/123.json"), is_file: true, hash: String::from("12345") }]};
+        ignore_extensions_single_folder(&mut dir, &vec![String::from(".ts")]);
+        assert_eq!(dir.backup_entries.len(), 2);
+        ignore_extensions_single_folder(&mut dir, &vec![String::from(".js")]);
+        assert_eq!(dir.backup_entries.len(), 1);
     }
 
     #[test]
     fn test_ignore_files_and_folders_parrarel() {
-        let paths = vec![String::from("/usr/lib/firefox"), String::from("/usr/lib/code")];
-        let ignore_files = vec![String::from(".so"), String::from(".json")];
-        let ignore_folders = vec![String::from("/browser"), String::from("/extensions")];
-        let cloud = BackupCloud::new(&paths);
+        let mut dir = BackupDir {files: 1, folders: 1, root_input: String::new(), root_output: String::new(), backup_entries: vec![
+            BackupEntry {input_path: String::from("/home/user/Downloads/X/node_modules"), output_path: String::from("/home/user/Downloads/backup/node_modules"), is_file: false, hash: String::new() },
+            BackupEntry{ input_path: String::from("/home/user/Downloads/X/node_modules/123.js"), output_path: String::from("/home/user/Downloads/backup/node_modules/123.json"), is_file: true, hash: String::from("12345") }]};
 
-
-        let map = BackupCloud::create_input_maps(&paths);
-        let len_start_firefox = map[0].backup_entries.len();
-        let len_start_code = map[1].backup_entries.len();
-
-        let map = BackupCloud::ignore_files_and_folders_parrarel(map, &ignore_files, &ignore_folders);
-        let len_end_firefox = map[0].backup_entries.len();
-        let len_end_code = map[1].backup_entries.len();
-
-        assert_eq!(len_start_firefox - len_end_firefox, 33);
-        assert_eq!(len_start_code - len_end_code, 1670);
+        let res = BackupCloud::ignore_files_and_folders_parrarel(vec![dir.clone()], &vec![String::from(".ts")], &vec![String::from("/dupa_modules")]);
+        assert_eq!(res[0].backup_entries.len(), 2);
+        let res = BackupCloud::ignore_files_and_folders_parrarel(vec![dir], &vec![String::from(".js")], &vec![String::from("/node_modules")]);
+        assert_eq!(res[0].backup_entries.len(), 0);
     }
 }
 
@@ -73,24 +69,17 @@ pub trait BackupIgnore {
     /// This test requires usage of struct that implements BackupInput trait, like BackupCloud or BackupMultiple.
     /// To pass test you need to provide your own paths and ignores variables, and count difference manually.
     /// ```
+    ///use flash_backup::backups::map::backup_entry::BackupEntry;
+    /// use flash_backup::backups::map::backup_dir::BackupDir;
     /// use flash_backup::backups::modes::backup_cloud::BackupCloud;
-    /// use flash_backup::backups::traits::backup_input::BackupInput;
     /// use flash_backup::backups::traits::backup_ignore::BackupIgnore;
-    /// let paths = vec![String::from("/usr/lib/firefox"), String::from("/usr/lib/code")];
-    /// let ignore_files = vec![String::from(".so"), String::from(".json")];
-    /// let ignore_folders = vec![String::from("/browser"), String::from("/extensions")];
-    /// let cloud = BackupCloud::new(&paths);
-    ///
-    ///  let map = BackupCloud::create_input_maps(&paths);
-    ///  let len_start_firefox = map[0].backup_entries.len();
-    ///  let len_start_code = map[1].backup_entries.len();
-    ///
-    ///  let map = BackupCloud::ignore_files_and_folders_parrarel(map, &ignore_files, &ignore_folders).unwrap();
-    ///  let len_end_firefox = map[0].backup_entries.len();
-    ///  let len_end_code = map[1].backup_entries.len();
-    ///
-    ///  assert_eq!(len_start_firefox - len_end_firefox, 33);
-    ///  assert_eq!(len_start_code - len_end_code, 1670);
+    /// let mut dir = BackupDir {files: 1, folders: 1, root_input: String::new(), root_output: String::new(), backup_entries: vec![
+    ///BackupEntry {input_path: String::from("/home/user/Downloads/X/node_modules"), output_path: String::from("/home/user/Downloads/backup/node_modules"), is_file: false, hash: String::new() },
+    ///BackupEntry{ input_path: String::from("/home/user/Downloads/X/node_modules/123.js"), output_path: String::from("/home/user/Downloads/backup/node_modules/123.json"), is_file: true, hash: String::from("12345") }]};
+    ///let res = BackupCloud::ignore_files_and_folders_parrarel(vec![dir.clone()], &vec![String::from(".ts")], &vec![String::from("/dupa_modules")]);
+    ///assert_eq!(res[0].backup_entries.len(), 2);
+    ///let res = BackupCloud::ignore_files_and_folders_parrarel(vec![dir], &vec![String::from(".js")], &vec![String::from("/node_modules")]);
+    ///assert_eq!(res[0].backup_entries.len(), 0);
     /// ```
     fn ignore_files_and_folders_parrarel(backup_dirs: Vec<BackupDir>, extensions_to_ignore: &Vec<String>, folders_to_ignore: &Vec<String>) -> Vec<BackupDir> {
         let mut backup_dirs = Arc::new(Mutex::new(backup_dirs));
@@ -105,7 +94,7 @@ pub trait BackupIgnore {
                 dirs
             }
             Err(e) => {
-                let message = format!("Fatal error while trying to create input maps - {}", e);
+                let message = format!("Fatal error while trying to create input maps - {}. Program will stop", e);
                 panic!(message);
             }
         }
@@ -124,15 +113,16 @@ pub trait BackupIgnore {
 /// This test requires usage of struct that implements BackupInput trait, like BackupCloud or BackupMultiple.
 /// To pass test you need to provide your own paths and ignores variables, and count difference manually.
 /// ```
-/// use flash_backup::backups::modes::backup_cloud::BackupCloud;
+/// use flash_backup::backups::map::backup_dir::BackupDir;
+/// use flash_backup::backups::map::backup_entry::BackupEntry;
 /// use flash_backup::backups::traits::backup_ignore::ignore_folders_single_folder;
-/// let ignores = vec![String::from("/browser")];
-/// let paths = vec![String::from("/usr/lib/firefox")];
-/// let mut cloud = BackupCloud::new(&paths);
-/// let len_start = cloud.map.backup_dirs[0].backup_entries.len();
-/// ignore_folders_single_folder(&mut cloud.map.backup_dirs[0], &ignores);
-/// let len_end = cloud.map.backup_dirs[0].backup_entries.len();
-/// assert_eq!(len_start - len_end, 22);
+/// let mut dir = BackupDir {files: 1, folders: 1, root_input: String::new(), root_output: String::new(), backup_entries: vec![
+/// BackupEntry {input_path: String::from("/home/user/Downloads/X/node_modules"), output_path: String::from("/home/user/Downloads/backup/node_modules"), is_file: false, hash: String::new() },
+/// BackupEntry{ input_path: String::from("/home/user/Downloads/X/node_modules/123.js"), output_path: String::from("/home/user/Downloads/backup/node_modules/123.json"), is_file: true, hash: String::from("12345") }]};
+/// ignore_folders_single_folder(&mut dir, &vec![String::from("/dupa_modules")]);
+/// assert_eq!(dir.backup_entries.len(), 2);
+/// ignore_folders_single_folder(&mut dir, &vec![String::from("/node_modules")]);
+/// assert_eq!(dir.backup_entries.len(), 0);
 /// ```
 pub fn ignore_extensions_single_folder(folder: &mut BackupDir, extensions_to_ignore: &Vec<String>) -> Result<(), String> {
     // Checking input
@@ -164,15 +154,16 @@ pub fn ignore_extensions_single_folder(folder: &mut BackupDir, extensions_to_ign
 /// This test requires usage of struct that implements BackupInput trait, like BackupCloud or BackupMultiple.
 /// To pass test you need to provide your own paths and ignores variables, and count difference manually.
 /// ```
-/// use flash_backup::backups::modes::backup_cloud::BackupCloud;
-/// use flash_backup::backups::traits::backup_ignore::ignore_folders_single_folder;
-/// let ignores = vec![String::from("/browser")];
-/// let paths = vec![String::from("/usr/lib/firefox")];
-/// let mut cloud = BackupCloud::new(&paths);
-/// let len_start = cloud.map.backup_dirs[0].backup_entries.len();
-/// ignore_folders_single_folder(&mut cloud.map.backup_dirs[0], &ignores);
-/// let len_end = cloud.map.backup_dirs[0].backup_entries.len();
-/// assert_eq!(len_start - len_end, 22);
+/// use flash_backup::backups::map::backup_dir::BackupDir;
+/// use flash_backup::backups::map::backup_entry::BackupEntry;
+/// use flash_backup::backups::traits::backup_ignore::ignore_extensions_single_folder;
+/// let mut dir = BackupDir {files: 1, folders: 1, root_input: String::new(), root_output: String::new(), backup_entries: vec![
+/// BackupEntry {input_path: String::from("/home/user/Downloads/X/node_modules"), output_path: String::from("/home/user/Downloads/backup/node_modules"), is_file: false, hash: String::new() },
+/// BackupEntry{ input_path: String::from("/home/user/Downloads/X/node_modules/123.js"), output_path: String::from("/home/user/Downloads/backup/node_modules/123.json"), is_file: true, hash: String::from("12345") }]};
+/// ignore_extensions_single_folder(&mut dir, &vec![String::from(".ts")]);
+/// assert_eq!(dir.backup_entries.len(), 2);
+/// ignore_extensions_single_folder(&mut dir, &vec![String::from(".js")]);
+/// assert_eq!(dir.backup_entries.len(), 1);
 /// ```
 pub fn ignore_folders_single_folder(folder: &mut BackupDir, folders_to_ignore: &Vec<String>) -> Result<(), String> {
     // Checking input
