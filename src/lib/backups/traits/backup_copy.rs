@@ -259,6 +259,7 @@ pub fn copy_file(entry: &BackupEntry) -> Result<(), String> {
                 }
                 Ok(destination) => {
                     // Copying file
+                    println!("Copying: {}", &entry.input_path);
                     let mut buf_writer = BufWriter::new(destination);
                     if let Err(e) = std::io::copy(&mut buf_reader, &mut buf_writer) {
                         let message = format!("Couldn't copy file {} to destination {}: {}", &entry.input_path, &entry.output_path, e);

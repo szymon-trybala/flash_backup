@@ -27,7 +27,6 @@ impl Config {
     /// Panics if user's data is wrong.
     pub fn create_backup_map(&mut self, run_new_config: usize, custom_config_path: &str, custom_ignore_path: &str) -> BackupMap {
         let mut config = Config::new();
-        println!("RUN NEW CONFIG: {}", run_new_config);
         if run_new_config == 0 {
             match config.load_existing_config(custom_config_path) {
                 Ok(custom_config) => config = custom_config,
